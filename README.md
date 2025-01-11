@@ -41,7 +41,7 @@ Ein professionelles Dateimanagement-Tool für automatisierte Dateiübertragungen
 
 2. **Erste Schritte**
    ```bash
-   python main.py
+   python ingest_tool.py
    ```
    - Klicken Sie auf "Einstellungen" zum Konfigurieren der Dateitypen
    - Wählen Sie Ihre Zielverzeichnisse
