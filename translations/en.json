@@ -1,0 +1,261 @@
+{
+    "language_name": "English",
+    
+    "general": {
+        "ready": "Ready",
+        "error": "Error",
+        "warning": "Warning",
+        "success": "Success",
+        "cancel": "Cancel",
+        "ok": "OK",
+        "apply": "Apply",
+        "close": "Close",
+        "save": "Save",
+        "delete": "Delete",
+        "edit": "Edit",
+        "add": "Add",
+        "remove": "Remove",
+        "browse": "...",
+        "move_up": "↑",
+        "move_down": "↓",
+        "info": "Information",
+        "file_created": "New file: {filename}",
+        "file_modified": "File modified: {filename}",
+        "file_deleted": "File deleted: {filename}",
+        "retry": "Retry"
+    },
+    
+    "main_window": {
+        "title": "TheGeekFreaks IngestTool 1.0",
+        "drives": "Drives",
+        "transfer": "Transfer",
+        "settings": "Settings",
+        "show": "Show",
+        "hide": "Hide",
+        "quit": "Quit"
+    },
+    
+    "drive": {
+        "connected": "Drive {label} ({letter}) connected",
+        "disconnected": "Drive {letter} disconnected",
+        "eject": "Safely remove drive",
+        "free_space": "{space} GB free",
+        "used_space": "{space} GB used",
+        "status": {
+            "ready": "Ready",
+            "busy": "Busy",
+            "error": "Error",
+            "disconnected": "Disconnected",
+            "unknown": "Unknown"
+        }
+    },
+    
+    "transfer": {
+        "start": "Start",
+        "stop": "Stop",
+        "priority": "Priority",
+        "high": "High",
+        "normal": "Normal",
+        "low": "Low",
+        "bandwidth_limit": "Bandwidth Limit (MB/s)",
+        "transfer_started": "Transfer in progress...",
+        "transfer_stopped": "Transfer stopped",
+        "transfer_completed": "Transfer completed",
+        "transfer_error": "Transfer error",
+        "remaining_time": "Remaining: {time}",
+        "speed": "{speed}/s",
+        "status": {
+            "pending": "Pending",
+            "active": "Active",
+            "paused": "Paused",
+            "completed": "Completed",
+            "error": "Error",
+            "cancelled": "Cancelled",
+            "ready": "Ready",
+            "running": "Running"
+        }
+    },
+    
+    "settings": {
+        "title": "Settings",
+        "general": {
+            "title": "General",
+            "language": "Language",
+            "behavior": "Behavior",
+            "delete_source": "Delete source files after successful transfer",
+            "show_notifications": "Show system notifications",
+            "minimize_to_tray": "Minimize to system tray when minimized",
+            "theme": "Theme",
+            "light": "Light",
+            "dark": "Dark",
+            "system": "System"
+        },
+        "network": {
+            "title": "Network",
+            "transfer": "Transfer",
+            "default_priority": "Default Priority:",
+            "bandwidth_limit": "Bandwidth Limit (MB/s):",
+            "parallel_transfers": "Parallel Transfers:",
+            "proxy": {
+                "title": "Proxy",
+                "use_proxy": "Use proxy",
+                "host": "Host:",
+                "port": "Port:"
+            }
+        },
+        "paths": {
+            "title": "Paths",
+            "targets": {
+                "title": "Target Directories",
+                "default_target": "Default Target Directory:"
+            },
+            "temp": {
+                "title": "Temporary Files",
+                "temp_dir": "Temporary Directory:",
+                "cleanup_temp": "Clean up temporary files on exit"
+            }
+        },
+        "transfer": {
+            "title": "Transfer Settings",
+            "buffer_size": "Buffer Size",
+            "parallel_copies": "Parallel Copies",
+            "verify": {
+                "title": "Verify",
+                "none": "None",
+                "quick": "Quick",
+                "full": "Full"
+            }
+        }
+    },
+    
+    "notifications": {
+        "drive_connected": {
+            "title": "Drive Connected",
+            "message": "{label} ({letter})"
+        },
+        "drive_disconnected": {
+            "title": "Drive Disconnected",
+            "message": "Drive {letter} has been disconnected"
+        },
+        "transfer_complete": {
+            "title": "Transfer Complete",
+            "message": "Transfer completed successfully"
+        },
+        "transfer_error": {
+            "title": "Transfer Error",
+            "message": "An error occurred during transfer"
+        }
+    },
+    
+    "file_events": {
+        "created": "New file: {name}",
+        "modified": "File modified: {name}",
+        "deleted": "File deleted: {name}"
+    },
+    
+    "ui": {
+        "language": "Language",
+        "connected_drives": "Connected Drives",
+        "excluded_drives": "Excluded Drives",
+        "exclude_all": "Exclude All",
+        "mappings": "Mappings",
+        "manage_filetypes": "Manage Additional File Types",
+        "manage_presets": "Manage Presets",
+        "settings": "Settings",
+        "delete_source_files": "Delete source files after copying",
+        "log": "Log",
+        "no_file": "No File",
+        "speed_format": "Speed: {speed}",
+        "cancel": "Cancel",
+        "cancel_tooltip": "Cancel transfer",
+        "cancel_transfer": "Cancel Transfer",
+        "target": "Target Directory",
+        "target_path_placeholder": "Select target directory...",
+        "browse": "Browse",
+        "ready": "Ready",
+        "copying": "Copying files...",
+        "no_mappings": "No file type mappings defined",
+        "no_target_path": "No target path selected",
+        "no_drive_selected": "No drive selected",
+        "start": "Start",
+        "control": "Control",
+        "auto_start": "Auto-Start",
+        "auto_start_tooltip": "Automatically start copying when a new drive is connected",
+        "actions": "Actions",
+        "manage_presets_tooltip": "Manage saved settings and mappings",
+        "manage_filetypes_tooltip": "Manage additional file types",
+        "delete_source_files_tooltip": "Delete source files after copying",
+        "log_tooltip": "View log",
+        "no_file_tooltip": "No file selected",
+        "speed_format_tooltip": "Speed: {speed}",
+        "start_tooltip": "Start transfer",
+        "advanced_settings": "Advanced Settings",
+        "advanced_settings_tooltip": "Additional settings for transfer and automation",
+        "ready_tooltip": "✨ Ready",
+        "drop_files": "📥 Drop files here to copy",
+        "save_preset": "💾 Save Preset",
+        "load_preset": "📂 Load Preset",
+        "delete_preset": "🗑️ Delete Preset",
+        "copy_settings": "Copy Settings",
+        "verify_mode": "Verify Mode",
+        "verify_none": "No Verification",
+        "verify_quick": "Quick Verification",
+        "verify_md5": "MD5 Verification",
+        "verify_sha1": "SHA1 Verification",
+        "parallel_copies": "Parallel Copies",
+        "buffer_size": "Buffer Size",
+        "progress": "Progress",
+        "transfer_completed": "Transfer Completed",
+        "transfer_failed": "Transfer Failed",
+        "transfer_cancelled": "Transfer Cancelled",
+        "starting_transfer": "Starting Transfer",
+        "select_target_directory": "Select Target Directory",
+        "select_filetype_first": "Please select a file type first",
+        "no_available_drives": "No available drives"
+    },
+    
+    "dialogs": {
+        "filetype_manager": {
+            "title": "File Type Manager",
+            "add_filetype": "Add File Type",
+            "remove_filetype": "Remove File Type",
+            "filetype_name": "File Type Name",
+            "invalid_filetype": "Invalid file type",
+            "confirm_delete": "Are you sure you want to delete this file type?"
+        },
+        "preset_manager": {
+            "title": "Preset Manager",
+            "new_preset": "New Preset",
+            "load_preset": "Load Preset",
+            "save_preset": "Save Preset",
+            "delete_preset": "Delete Preset",
+            "preset_name": "Preset Name",
+            "no_preset_name": "Please enter a preset name",
+            "invalid_preset": "Invalid preset",
+            "preset_loaded": "Preset loaded",
+            "preset_saved": "Preset saved",
+            "preset_deleted": "Preset deleted",
+            "confirm_delete": "Are you sure you want to delete this preset?",
+            "confirm_overwrite": "A preset with this name already exists. Do you want to overwrite it?"
+        }
+    },
+    
+    "messages": {
+        "file_created": "New file: {filename}",
+        "file_modified": "File modified: {filename}",
+        "file_deleted": "File deleted: {filename}",
+        "copy_started": "Copy started",
+        "copy_completed": "Copy completed",
+        "copy_failed": "Copy failed",
+        "copy_cancelled": "Copy cancelled",
+        "verify_started": "Verification started",
+        "transfer_started": "Transfer started",
+        "transfer_completed": "Transfer completed",
+        "transfer_failed": "Transfer failed",
+        "transfer_cancelled": "Transfer cancelled",
+        "no_drives": "No drives connected",
+        "drive_connected": "Drive {drive} connected",
+        "drive_disconnected": "Drive {drive} disconnected",
+        "file_found": "File found: {file}"
+    }
+}

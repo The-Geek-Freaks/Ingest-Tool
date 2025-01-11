@@ -1,0 +1,259 @@
+{
+    "language_name": "Deutsch",
+    
+    "general": {
+        "ready": "Bereit",
+        "error": "Fehler",
+        "warning": "Warnung",
+        "success": "Erfolg",
+        "cancel": "Abbrechen",
+        "ok": "OK",
+        "apply": "Übernehmen",
+        "close": "Schließen",
+        "save": "Speichern",
+        "delete": "Löschen",
+        "edit": "Bearbeiten",
+        "add": "Hinzufügen",
+        "remove": "Entfernen",
+        "browse": "...",
+        "move_up": "↑",
+        "move_down": "↓",
+        "info": "Information",
+        "file_created": "Neue Datei: {filename}",
+        "file_modified": "Datei geändert: {filename}",
+        "file_deleted": "Datei gelöscht: {filename}",
+        "retry": "Wiederholen"
+    },
+    
+    "main_window": {
+        "title": "TheGeekFreaks IngestTool 1.0",
+        "drives": "Laufwerke",
+        "transfer": "Übertragung",
+        "settings": "Einstellungen",
+        "show": "Anzeigen",
+        "hide": "Ausblenden",
+        "quit": "Beenden"
+    },
+    
+    "drive": {
+        "connected": "Laufwerk {label} ({letter}) verbunden",
+        "disconnected": "Laufwerk {letter} getrennt",
+        "eject": "Laufwerk sicher entfernen",
+        "free_space": "{space} GB frei",
+        "used_space": "{space} GB belegt",
+        "status": {
+            "ready": "Bereit",
+            "busy": "Beschäftigt",
+            "error": "Fehler",
+            "disconnected": "Getrennt",
+            "unknown": "Unbekannt"
+        }
+    },
+    
+    "transfer": {
+        "start": "Start",
+        "stop": "Stop",
+        "priority": "Priorität",
+        "high": "Hoch",
+        "normal": "Normal",
+        "low": "Niedrig",
+        "status": {
+            "ready": "Bereit",
+            "running": "Läuft",
+            "paused": "Pausiert",
+            "completed": "Abgeschlossen",
+            "error": "Fehler",
+            "pending": "Ausstehend",
+            "active": "Aktiv",
+            "cancelled": "Abgebrochen"
+        },
+        "bandwidth_limit": "Bandbreitenlimit (MB/s)",
+        "transfer_started": "Übertragung gestartet",
+        "transfer_stopped": "Übertragung gestoppt",
+        "transfer_completed": "Übertragung abgeschlossen",
+        "transfer_error": "Übertragungsfehler",
+        "remaining_time": "Verbleibende Zeit",
+        "speed": "Geschwindigkeit"
+    },
+    
+    "settings": {
+        "title": "Einstellungen",
+        "general": {
+            "title": "Allgemein",
+            "language": "Sprache",
+            "theme": "Design",
+            "light": "Hell",
+            "dark": "Dunkel",
+            "system": "System",
+            "behavior": "Verhalten",
+            "delete_source": "Quelldateien nach erfolgreicher Übertragung löschen",
+            "show_notifications": "Systembenachrichtigungen anzeigen",
+            "minimize_to_tray": "In den System Tray minimieren"
+        },
+        "transfer": {
+            "title": "Übertragungseinstellungen",
+            "buffer_size": "Puffergröße",
+            "parallel_copies": "Parallele Kopien",
+            "verify": {
+                "title": "Überprüfung",
+                "none": "Keine",
+                "quick": "Schnell",
+                "full": "Vollständig"
+            }
+        },
+        "network": {
+            "title": "Netzwerk",
+            "transfer": "Übertragung",
+            "default_priority": "Standardpriorität",
+            "parallel_transfers": "Parallele Übertragungen",
+            "bandwidth_limit": "Bandbreitenlimit",
+            "proxy": {
+                "title": "Proxy",
+                "use_proxy": "Proxy verwenden",
+                "host": "Host",
+                "port": "Port"
+            }
+        },
+        "paths": {
+            "title": "Pfade",
+            "temp": {
+                "title": "Temporäre Dateien",
+                "temp_dir": "Temporäres Verzeichnis",
+                "cleanup_temp": "Temporäre Dateien beim Beenden aufräumen"
+            },
+            "targets": {
+                "title": "Zielverzeichnisse",
+                "default_target": "Standardzielverzeichnis"
+            }
+        }
+    },
+    
+    "ui": {
+        "available_drives": "Ingestierende Laufwerke",
+        "language": "Sprache",
+        "connected_drives": "Verbundene Laufwerke",
+        "mappings": "Zuordnungen",
+        "excluded_drives": "Ausgeschlossene Laufwerke",
+        "protocol": "Protokoll",
+        "progress": "Fortschritt",
+        "ready": "Bereit",
+        "start": "Start",
+        "cancel": "Abbrechen",
+        "delete_source_files": "Quelldateien nach Übertragung löschen",
+        "no_file": "Keine Datei ausgewählt",
+        "speed_format": "Geschwindigkeit: {speed}",
+        "manage_presets": "Voreinstellungen verwalten",
+        "advanced_settings": "Erweiterte Einstellungen",
+        "settings": "Einstellungen",
+        "exclude_all": "Alle ausschließen",
+        "file_type": "Dateityp:",
+        "browse": "Durchsuchen",
+        "storage": "Speicher: {free} frei von {total}",
+        "cpu": "CPU: {usage}%",
+        "log": "Protokoll",
+        "log_tooltip": "Protokoll anzeigen",
+        "no_file_tooltip": "Keine Datei ausgewählt",
+        "speed_format_tooltip": "Geschwindigkeit: {speed}",
+        "start_tooltip": "Kopiervorgang starten",
+        "cancel_tooltip": "Kopiervorgang abbrechen",
+        "cancel_transfer": "Übertragung abbrechen",
+        "drop_files": "📥 Dateien hier ablegen zum Kopieren",
+        "save_preset": "💾 Preset speichern",
+        "load_preset": "📂 Preset laden",
+        "delete_preset": "🗑️ Preset löschen",
+        "copy_settings": "Kopieroptionen",
+        "verify_mode": "Überprüfungsmodus",
+        "verify_none": "Keine Überprüfung",
+        "verify_quick": "Schnelle Überprüfung",
+        "verify_md5": "MD5-Überprüfung",
+        "verify_sha1": "SHA1-Überprüfung",
+        "parallel_copies": "Parallele Kopien",
+        "buffer_size": "Puffergröße",
+        "transfer_completed": "Übertragung abgeschlossen",
+        "transfer_failed": "Übertragung fehlgeschlagen",
+        "transfer_cancelled": "Übertragung abgebrochen",
+        "starting_transfer": "Starte Übertragung",
+        "select_target_directory": "Zielverzeichnis auswählen",
+        "select_filetype_first": "Bitte wählen Sie zuerst einen Dateityp aus",
+        "no_available_drives": "Keine verfügbaren Laufwerke",
+        "no_mappings": "Keine Zuordnungen definiert",
+        "no_target_path": "Kein Zielverzeichnis ausgewählt",
+        "no_drive_selected": "Kein Laufwerk ausgewählt",
+        "control": "Steuerung",
+        "auto_start": "Auto-Start",
+        "auto_start_tooltip": "Automatisch mit dem Kopieren beginnen, wenn ein neues Laufwerk verbunden wird",
+        "target": "Zielverzeichnis",
+        "target_path_placeholder": "Zielverzeichnis auswählen...",
+        "copying": "Kopiere Dateien..."
+    },
+    
+    "dialogs": {
+        "filetype_manager": {
+            "title": "Dateityp-Manager",
+            "add_filetype": "Dateityp hinzufügen",
+            "remove_filetype": "Dateityp entfernen",
+            "filetype_name": "Dateityp-Name",
+            "invalid_filetype": "Ungültiger Dateityp",
+            "confirm_delete": "Möchten Sie diesen Dateityp wirklich löschen?"
+        },
+        "preset_manager": {
+            "title": "Preset-Manager",
+            "new_preset": "Neues Preset",
+            "load_preset": "Preset laden",
+            "save_preset": "Preset speichern",
+            "delete_preset": "Preset löschen",
+            "preset_name": "Preset-Name",
+            "no_preset_name": "Bitte geben Sie einen Preset-Namen ein",
+            "invalid_preset": "Ungültiges Preset",
+            "preset_loaded": "Preset geladen",
+            "preset_saved": "Preset gespeichert",
+            "preset_deleted": "Preset gelöscht",
+            "confirm_delete": "Möchten Sie dieses Preset wirklich löschen?",
+            "confirm_overwrite": "Ein Preset mit diesem Namen existiert bereits. Möchten Sie es überschreiben?"
+        }
+    },
+    
+    "messages": {
+        "file_created": "Neue Datei: {filename}",
+        "file_modified": "Datei geändert: {filename}",
+        "file_deleted": "Datei gelöscht: {filename}",
+        "file_found": "Datei gefunden: {filename}",
+        "copy_started": "Kopieren gestartet",
+        "copy_completed": "Kopieren abgeschlossen",
+        "copy_failed": "Kopieren fehlgeschlagen",
+        "copy_cancelled": "Kopieren abgebrochen",
+        "verify_started": "Überprüfung gestartet",
+        "drive_connected": "Laufwerk verbunden: {drive}",
+        "drive_disconnected": "Laufwerk getrennt: {drive}",
+        "transfer_started": "Übertragung gestartet",
+        "transfer_completed": "Übertragung abgeschlossen",
+        "transfer_failed": "Übertragung fehlgeschlagen",
+        "transfer_cancelled": "Übertragung abgebrochen",
+        "no_drives": "Keine Laufwerke verfügbar"
+    },
+    
+    "notifications": {
+        "drive_connected": {
+            "title": "Laufwerk verbunden",
+            "message": "{label} ({letter})"
+        },
+        "drive_disconnected": {
+            "title": "Laufwerk getrennt",
+            "message": "Laufwerk {letter} wurde getrennt"
+        },
+        "transfer_complete": {
+            "title": "Übertragung abgeschlossen",
+            "message": "Die Übertragung wurde erfolgreich abgeschlossen"
+        },
+        "transfer_error": {
+            "title": "Übertragungsfehler",
+            "message": "Bei der Übertragung ist ein Fehler aufgetreten"
+        }
+    },
+    
+    "file_events": {
+        "created": "Erstellt",
+        "modified": "Geändert",
+        "deleted": "Gelöscht"
+    }
+}

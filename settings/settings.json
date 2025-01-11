@@ -1,0 +1,39 @@
+{
+    "file_types": [
+        "*.mp4"
+    ],
+    "mappings": {
+        "*.mp4": "U:/"
+    },
+    "excluded_drives": [
+        "G",
+        "K",
+        "U",
+        "L",
+        "P",
+        "Z",
+        "T",
+        "Q",
+        "V",
+        "N",
+        "C",
+        "E",
+        "D",
+        "R",
+        "W",
+        "X",
+        "Y"
+    ],
+    "delete_source": false,
+    "network_settings": {},
+    "ui_settings": {},
+    "auto_start": false,
+    "target_path": "",
+    "window_geometry": "01d9d0cb0003000000000008000000000000050900000346000000090000002600000508000003450000000000000000140000000009000000260000050800000345",
+    "window_state": "000000ff00000000fd00000000000005000000032000000004000000040000000800000008fc00000000",
+    "parallel_copies": 2,
+    "buffer_size": 65536,
+    "verify_copies": false,
+    "recursive_search": true,
+    "show_notifications": true
+}
