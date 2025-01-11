@@ -1,128 +1,111 @@
-# Ingest Tool
+# 🚀 TheGeekFreaks Ingest-Tool
 
-Ein leistungsfähiges Tool zur automatisierten Dateiübertragung und -organisation von verschiedenen Laufwerken.
+Ein professionelles Dateimanagement-Tool für automatisierte Dateiübertragungen zwischen Laufwerken. Ideal für Fotografen, Videografen und Content Creator.
 
-## 🌟 Features
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Python](https://img.shields.io/badge/python-3.8+-green.svg)
+![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
-- **Intelligente Laufwerkserkennung**
-  - Automatische Erkennung von lokalen, USB- und Netzwerklaufwerken
-  - Echtzeit-Status-Updates für verbundene Laufwerke
-  - Visuelle Unterscheidung verschiedener Laufwerkstypen (💾 USB, 💿 Lokal, ☁️ Netzwerk)
+## ✨ Hauptfunktionen
 
-- **Flexible Dateiübertragung**
-  - Regelbasierte Dateiorganisation
-  - Parallele Dateiübertragungen für höhere Geschwindigkeit
-  - Fortschrittsanzeige in Echtzeit
-  - Pause/Fortsetzen-Funktion
+### 📁 Intelligentes Dateimanagement
+- **Automatische Laufwerkserkennung**: Sofortige Erkennung von USB-Sticks, SD-Karten und Netzwerklaufwerken
+- **Smart-Sorting**: Automatische Sortierung nach Dateitypen in konfigurierbare Zielverzeichnisse
+- **Echtzeit-Überwachung**: Sofortige Verarbeitung neuer Dateien auf überwachten Laufwerken
 
-- **Erweiterte Verwaltung**
-  - Ausschluss bestimmter Laufwerke
-  - Voreinstellungen für häufig verwendete Konfigurationen
-  - Detaillierte Protokollierung aller Vorgänge
+### 🔄 Leistungsstarke Übertragung
+- **Parallele Transfers**: Mehrere Dateien gleichzeitig übertragen
+- **Fortschrittsanzeige**: Detaillierte Statusanzeige für jeden Transfer
+- **Abbruch-Funktion**: Flexibler Stop einzelner oder aller Transfers
+- **Quellschutz**: Optional können Quelldateien nach erfolgreicher Übertragung automatisch gelöscht werden
 
-## 🚀 Installation
+### ⚙️ Anpassbare Konfiguration
+- **Dateityp-Filter**: Fokussierung auf relevante Dateiformate (z.B. RAW, JPG, MP4)
+- **Laufwerks-Blacklist**: Ausschluss bestimmter Laufwerke von der Überwachung
+- **Zielverzeichnis-Mapping**: Flexible Zuordnung von Dateitypen zu Zielordnern
 
-1. Stellen Sie sicher, dass Python 3.8 oder höher installiert ist
-2. Klonen Sie das Repository:
+## 🎯 Anwendungsfälle
+
+- **Fotografie**: Automatischer Import von Fotos von SD-Karten
+- **Videoproduktion**: Organisierte Ablage von Footage nach Projekten
+- **Backup**: Automatische Sicherung wichtiger Dateien auf NAS oder externe Festplatten
+
+## 💻 Schnellstart
+
+1. **Download & Installation**
    ```bash
-   git clone https://github.com/yourusername/ingest-tool.git
+   git clone https://github.com/thegeekfreaks/ingest-tool.git
    cd ingest-tool
-   ```
-3. Installieren Sie die Abhängigkeiten:
-   ```bash
    pip install -r requirements.txt
    ```
 
+2. **Erste Schritte**
+   ```bash
+   python main.py
+   ```
+   - Klicken Sie auf "Einstellungen" zum Konfigurieren der Dateitypen
+   - Wählen Sie Ihre Zielverzeichnisse
+   - Drücken Sie "Start" zum Beginnen der Überwachung
+
 ## 🛠️ Konfiguration
 
-Die Konfiguration erfolgt über die `config.json` Datei im Hauptverzeichnis:
+### Grundeinstellungen
+- Wählen Sie zu überwachende Laufwerke
+- Definieren Sie Dateityp-Filter (*.raw, *.jpg, *.mp4)
+- Legen Sie Zielverzeichnisse fest
 
+### Erweiterte Optionen
 ```json
 {
-  "language": "de",
-  "default_filetype": "all",
-  "parallel_transfers": 2,
-  "auto_start": false
+  "delete_source": false,        // Quelldateien nach Transfer löschen
+  "parallel_transfers": 2,       // Anzahl gleichzeitiger Transfers
+  "check_interval": 5,          // Überprüfungsintervall in Sekunden
+  "auto_start": false           // Automatischer Start beim Programmstart
 }
 ```
 
-### Verfügbare Einstellungen:
-- `language`: Sprache der Benutzeroberfläche (de, en)
-- `default_filetype`: Standard-Dateityp-Filter
-- `parallel_transfers`: Anzahl paralleler Übertragungen
-- `auto_start`: Automatischer Start bei Laufwerkserkennung
+## 🎮 Bedienung
 
-## 🖥️ Verwendung
+### Hauptfenster
+- **Start/Stop**: Überwachung starten oder beenden
+- **Abbrechen**: Aktive Transfers stoppen
+- **Status**: Echtzeit-Übersicht aller Transfers
+- **Laufwerke**: Liste verfügbarer und ausgeschlossener Laufwerke
 
-1. Starten Sie das Tool:
-   ```bash
-   python ingest_tool.py
-   ```
+### Transfer-Steuerung
+- Fortschrittsanzeige pro Transfer
+- Geschwindigkeitsanzeige in MB/s
+- Abbruch-Option für einzelne Transfers
+- Gesamtfortschritt aller Transfers
 
-2. Hauptfunktionen:
-   - **Laufwerke**: Zeigt alle verfügbaren Laufwerke mit Status
-   - **Zuordnungen**: Verwaltet Regeln für Dateiübertragungen
-   - **Filter**: Wählt Dateitypen für die Übertragung
-   - **Presets**: Speichert und lädt häufig verwendete Einstellungen
+## 🔧 Fehlerbehebung
 
-## 🏗️ Projektstruktur
+### Häufige Probleme
+- **Laufwerk nicht erkannt**: USB-Verbindung prüfen
+- **Transfer stockt**: Zielverzeichnis auf freien Speicherplatz prüfen
+- **Programm reagiert nicht**: Log-Dateien unter `logs/` prüfen
 
-```
-ingest-tool/
-├── core/                 # Kernfunktionalität
-│   ├── drive_controller/    # Laufwerksverwaltung
-│   └── transfer/           # Dateiübertragung
-├── ui/                  # Benutzeroberfläche
-│   ├── widgets/           # UI-Komponenten
-│   ├── handlers/          # Event-Handler
-│   └── layouts/           # Layout-Definitionen
-├── utils/               # Hilfsfunktionen
-├── config/              # Konfigurationsdateien
-└── translations/        # Sprachdateien
-```
+### Log-Dateien
+- Detaillierte Logs unter `logs/ingest.log`
+- Fehlerberichte unter `logs/error.log`
 
-## 🔧 Entwicklung
+## 📱 Support & Kontakt
 
-### Voraussetzungen
-- Python 3.8+
-- PyQt5
-- pytest für Tests
-
-### Tests ausführen
-```bash
-pytest tests/
-```
-
-### Code-Stil
-- PEP 8 Konventionen
-- Docstrings für alle Klassen und Methoden
-- Typisierung mit Python Type Hints
-
-## 📝 Lizenz
-
-Dieses Projekt ist unter der MIT-Lizenz lizenziert. Siehe [LICENSE](LICENSE) für Details.
+- **GitHub Issues**: Bug-Reports und Feature-Requests
+- **E-Mail**: support@thegeekfreaks.de
+- **Discord**: [TheGeekFreaks Community](https://discord.gg/thegeekfreaks)
 
 ## 🤝 Mitwirken
 
+Wir freuen uns über Beiträge! Bitte beachten Sie unsere Contribution Guidelines:
 1. Fork des Repositories
-2. Feature-Branch erstellen (`git checkout -b feature/AmazingFeature`)
-3. Änderungen committen (`git commit -m 'Add some AmazingFeature'`)
-4. Branch pushen (`git push origin feature/AmazingFeature`)
-5. Pull Request erstellen
+2. Feature-Branch erstellen
+3. Code dokumentieren
+4. Pull Request einreichen
 
-## 🐛 Bekannte Probleme
+## 📄 Lizenz
 
-- Einige Netzwerklaufwerke werden möglicherweise nicht korrekt erkannt
-- Große Dateien können bei der Vorschau zu Verzögerungen führen
+MIT License - Siehe [LICENSE](LICENSE) für Details
 
-## 📞 Support
-
-Bei Fragen oder Problemen:
-1. Überprüfen Sie die [Issues](https://github.com/yourusername/ingest-tool/issues)
-2. Erstellen Sie ein neues Issue mit detaillierter Beschreibung
-3. Kontaktieren Sie das Entwicklerteam
-
-## 🙏 Danksagung
-
-- PyQt5 Team für das großartige UI-Framework
-- Alle Mitwirkenden und Tester
+---
+Entwickelt mit ❤️ von TheGeekFreaks
