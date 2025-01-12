@@ -215,6 +215,9 @@ def main():
         window = MainWindow(app)
         window.show()
         
+        # Setze die finale Größe nach dem Anzeigen
+        window.resize(1440, 1230)
+        
         # Führe Event-Loop aus und beende sauber
         return sys.exit(app.exec_())
         

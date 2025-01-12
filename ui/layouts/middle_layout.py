@@ -16,7 +16,7 @@ def create_middle_layout(window):
     
     # Zuordnungen
     mappings_group = QGroupBox()
-    mappings_group.setTitle(" " + window.i18n.get("ui.mappings"))
+    mappings_group.setTitle("📁 " + window.i18n.get("ui.mappings"))
     mappings_layout = QVBoxLayout(mappings_group)
     
     # Dateityp und Zielverzeichnis
@@ -31,7 +31,7 @@ def create_middle_layout(window):
     mapping_input_layout.addWidget(window.filetype_combo)
     
     # Button für Zielverzeichnis
-    window.browse_button = QPushButton(" " + window.i18n.get("ui.browse"))
+    window.browse_button = QPushButton("📂 " + window.i18n.get("ui.browse"))
     window.browse_button.clicked.connect(window.event_handlers.on_browse_clicked)
     mapping_input_layout.addWidget(window.browse_button)
     
@@ -43,8 +43,8 @@ def create_middle_layout(window):
     
     # Mapping Buttons
     mapping_buttons = QHBoxLayout()
-    window.add_mapping_button = QPushButton(" " + window.i18n.get("general.add"))
-    window.remove_mapping_button = QPushButton(" " + window.i18n.get("general.remove"))
+    window.add_mapping_button = QPushButton("➕ " + window.i18n.get("general.add"))
+    window.remove_mapping_button = QPushButton("🗑️ " + window.i18n.get("general.remove"))
     window.add_mapping_button.clicked.connect(window._on_add_mapping_clicked)
     window.remove_mapping_button.clicked.connect(window._on_remove_mapping_clicked)
     mapping_buttons.addWidget(window.add_mapping_button)
@@ -54,16 +54,16 @@ def create_middle_layout(window):
     
     # Ausgeschlossene Laufwerke
     excluded_group = QGroupBox()
-    excluded_group.setTitle(" " + window.i18n.get("ui.excluded_drives"))
+    excluded_group.setTitle("🚫 " + window.i18n.get("ui.excluded_drives"))
     excluded_layout = QVBoxLayout(excluded_group)
     window.excluded_list = QListWidget()
     excluded_layout.addWidget(window.excluded_list)
     
     # Excluded Buttons
     excluded_buttons = QHBoxLayout()
-    window.add_excluded_button = QPushButton(" " + window.i18n.get("general.add"))
-    window.remove_excluded_button = QPushButton(" " + window.i18n.get("general.remove"))
-    window.exclude_all_button = QPushButton(" " + window.i18n.get("ui.exclude_all"))
+    window.add_excluded_button = QPushButton("🚫 " + window.i18n.get("general.add"))
+    window.remove_excluded_button = QPushButton("✅ " + window.i18n.get("general.remove"))
+    window.exclude_all_button = QPushButton("⛔ " + window.i18n.get("ui.exclude_all"))
     window.add_excluded_button.clicked.connect(window.event_handlers.on_add_excluded_path_clicked)
     window.remove_excluded_button.clicked.connect(window._on_remove_excluded_clicked)
     window.exclude_all_button.clicked.connect(window._on_exclude_all_clicked)

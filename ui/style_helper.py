@@ -6,19 +6,37 @@ from PyQt5.QtGui import QPalette, QColor
 from PyQt5.QtCore import Qt
 
 class StyleHelper:
-    """Hilfsklasse für einheitliches Styling der UI-Komponenten."""
+    """Zentrale Style-Definitionen für die Anwendung."""
+    
+    # Hauptfarben
+    BACKGROUND = "#1E1E1E"           # Dunkelgrau (Haupthintergrund)
+    SURFACE = "#2D2D2D"              # Helleres Grau (Widget-Hintergrund)
+    SURFACE_LIGHT = "#3D3D3D"        # Noch helleres Grau (Hover, Selected)
+    ACCENT = "#6B7280"               # Mittleres Grau (Akzentfarbe)
+    ACCENT_LIGHT = "#9CA3AF"         # Helles Grau
+    BORDER = "#4D4D4D"               # Grau für Rahmen
+    
+    # Textfarben
+    TEXT = "#FFFFFF"                 # Weiß
+    TEXT_SECONDARY = "#A0A0A0"       # Hellgrau
+    
+    # Status-Farben
+    SUCCESS = "#4CAF50"              # Grün
+    WARNING = "#FF9800"              # Orange
+    ERROR = "#F44336"                # Rot
+    INFO = "#6B7280"                 # Grau (wie Akzentfarbe)
     
     DARK_PALETTE = {
-        'window': '#2b2b2b',
-        'window-text': '#ffffff',
-        'base': '#323232',
-        'alternate-base': '#383838',
-        'text': '#ffffff',
-        'button': '#555555',
-        'button-text': '#ffffff',
-        'bright-text': '#ffffff',
-        'highlight': '#2d5ca6',
-        'highlight-text': '#ffffff'
+        'window': BACKGROUND,
+        'window-text': TEXT,
+        'base': SURFACE,
+        'alternate-base': SURFACE_LIGHT,
+        'text': TEXT,
+        'button': SURFACE,
+        'button-text': TEXT,
+        'bright-text': TEXT,
+        'highlight': ACCENT,
+        'highlight-text': BACKGROUND
     }
     
     @staticmethod
@@ -484,3 +502,99 @@ class StyleHelper:
         # Setze einen Platzhaltertext
         if combo.currentText() == "":
             combo.setPlaceholderText("Bitte auswählen")
+
+    @classmethod
+    def get_main_window_style(cls) -> str:
+        """Stil für das Hauptfenster."""
+        return f"""
+            QMainWindow {{
+                background-color: {cls.BACKGROUND};
+            }}
+        """
+    
+    @classmethod
+    def get_widget_style(cls) -> str:
+        """Basis-Stil für Widgets."""
+        return f"""
+            QWidget {{
+                background-color: {cls.SURFACE};
+                border: 1px solid {cls.BORDER};
+                border-radius: 4px;
+            }}
+        """
+    
+    @classmethod
+    def get_list_style(cls) -> str:
+        """Stil für Listen."""
+        return f"""
+            QListWidget {{
+                background-color: {cls.SURFACE};
+                border: 1px solid {cls.BORDER};
+                border-radius: 4px;
+                padding: 4px;
+            }}
+            QListWidget::item {{
+                background-color: transparent;
+                padding: 0px;
+                margin: 2px 0px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {cls.SURFACE_LIGHT};
+            }}
+            QListWidget::item:hover {{
+                background-color: {cls.SURFACE_LIGHT};
+            }}
+        """
+    
+    @classmethod
+    def get_scroll_bar_style(cls) -> str:
+        """Stil für Scrollbars."""
+        return f"""
+            QScrollBar:vertical {{
+                background-color: {cls.SURFACE};
+                width: 12px;
+                margin: 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background-color: {cls.BORDER};
+                min-height: 20px;
+                border-radius: 6px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background-color: {cls.ACCENT};
+            }}
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
+            QScrollBar::add-page:vertical,
+            QScrollBar::sub-page:vertical {{
+                background: none;
+            }}
+        """
+    
+    @classmethod
+    def get_button_style(cls) -> str:
+        """Stil für Buttons."""
+        return f"""
+            QPushButton {{
+                background-color: {cls.SURFACE};
+                border: 1px solid {cls.BORDER};
+                border-radius: 4px;
+                padding: 6px 12px;
+                color: {cls.TEXT};
+            }}
+            QPushButton:hover {{
+                background-color: {cls.SURFACE_LIGHT};
+                border-color: {cls.ACCENT};
+            }}
+            QPushButton:pressed {{
+                background-color: {cls.ACCENT};
+                color: {cls.BACKGROUND};
+            }}
+            QPushButton:disabled {{
+                background-color: {cls.SURFACE};
+                border-color: {cls.BORDER};
+                color: {cls.TEXT_SECONDARY};
+            }}
+        """

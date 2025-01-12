@@ -108,18 +108,16 @@ class ProgressWidget(QWidget):
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(5)
         
-        title_label = QLabel("Kopierfortschritt")
-        title_label.setStyleSheet("""
+        # Titel
+        title = QLabel("Kopierfortschritt")
+        title.setStyleSheet("""
             QLabel {
-                color: #ffffff;
-                font-size: 14px;
+                color: #E5E7EB;
                 font-weight: bold;
-                padding: 5px;
-                background-color: #2d5ca6;
-                border-radius: 3px;
+                font-size: 14px;
             }
         """)
-        header_layout.addWidget(title_label)
+        header_layout.addWidget(title)
         
         # Gesamtfortschritt
         self.total_progress = QProgressBar()
@@ -127,39 +125,32 @@ class ProgressWidget(QWidget):
         self.total_progress.setValue(0)
         self.total_progress.setStyleSheet("""
             QProgressBar {
-                border: 1px solid #2d5ca6;
-                border-radius: 3px;
+                background-color: #374151;
+                border: 1px solid #4B5563;
+                border-radius: 4px;
                 text-align: center;
-                background-color: #323232;
+                color: white;
+                height: 20px;
             }
             QProgressBar::chunk {
-                background-color: #2d5ca6;
+                background-color: #4B5563;
+                border-radius: 3px;
             }
         """)
         header_layout.addWidget(self.total_progress)
-        
         main_layout.addWidget(header_widget)
         
         # Container für die Laufwerke
         self.drives_container = QWidget()
-        self.drives_container.setStyleSheet("""
-            QWidget {
-                background-color: #323232;
-                border: 1px solid #2d5ca6;
-                border-radius: 3px;
-            }
-        """)
-        
-        # Layout für die Laufwerke
         self.drives_layout = QVBoxLayout(self.drives_container)
-        self.drives_layout.setContentsMargins(5, 5, 5, 5)
-        self.drives_layout.setSpacing(5)
+        self.drives_layout.setContentsMargins(0, 0, 0, 0)
+        self.drives_layout.setSpacing(10)
         
-        # Platzhalter-Text wenn keine Laufwerke vorhanden
+        # Platzhalter-Text
         self.placeholder_label = QLabel("Keine aktiven Kopiervorgänge")
         self.placeholder_label.setStyleSheet("""
             QLabel {
-                color: #888888;
+                color: #9CA3AF;
                 font-style: italic;
                 padding: 20px;
             }
@@ -167,81 +158,92 @@ class ProgressWidget(QWidget):
         self.placeholder_label.setAlignment(Qt.AlignCenter)
         self.drives_layout.addWidget(self.placeholder_label)
         
-        # Scroll-Bereich für die Laufwerke
-        scroll_area = QScrollArea()
-        scroll_area.setWidget(self.drives_container)
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll_area.setStyleSheet("""
+        # Scroll-Bereich
+        scroll = QScrollArea()
+        scroll.setWidget(self.drives_container)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameStyle(QFrame.NoFrame)
+        scroll.setStyleSheet("""
             QScrollArea {
-                border: none;
                 background-color: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background-color: #2D2D2D;
+                width: 12px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #4B5563;
+                border-radius: 6px;
+                min-height: 20px;
+                margin: 2px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
             }
         """)
         
-        main_layout.addWidget(scroll_area)
-            
-    def add_drive(self, drive_letter: str, drive_name: str = None):
-        """Fügt ein neues Laufwerk hinzu.
+        # Container Styling
+        self.drives_container.setStyleSheet("""
+            QWidget {
+                background-color: transparent;
+            }
+            QProgressBar {
+                background-color: #374151;
+                border: 1px solid #4B5563;
+                border-radius: 4px;
+                text-align: center;
+                color: white;
+                height: 16px;
+            }
+            QProgressBar::chunk {
+                background-color: #4B5563;
+                border-radius: 3px;
+            }
+            QLabel {
+                color: #E5E7EB;
+            }
+        """)
         
-        Args:
-            drive_letter: Buchstabe des Laufwerks
-            drive_name: Optionaler Anzeigename
-        """
+        main_layout.addWidget(scroll)
+        
+    def add_drive(self, drive_letter: str, drive_name: str = None):
+        """Fügt ein neues Laufwerk hinzu."""
         try:
-            # Add to active transfers
-            self.active_transfers.add(drive_letter)
-            
-            # Create or update drive widget
             if drive_letter not in self.drive_widgets:
-                # Standardname falls keiner angegeben
-                if drive_name is None:
-                    drive_name = f"Laufwerk {drive_letter}"
-                
-                # Neues DriveProgress Widget erstellen
-                drive_widget = DriveProgress(drive_letter, drive_name, self)
-                
-                # Platzhalter entfernen wenn erstes Laufwerk
+                # Platzhalter ausblenden beim ersten Laufwerk
                 if len(self.drive_widgets) == 0:
                     self.placeholder_label.hide()
                 
-                # Widget zum Layout hinzufügen
-                self.drives_layout.addWidget(drive_widget)
-                
-                # Widget und Bytes-Tracking initialisieren
+                # Neues DriveProgress Widget erstellen
+                drive_widget = DriveProgress(drive_letter, drive_name, self)
+                self.drives_layout.insertWidget(self.drives_layout.count() - 1, drive_widget)
                 self.drive_widgets[drive_letter] = drive_widget
-                self.total_bytes[drive_letter] = 0
-                self.transferred_bytes[drive_letter] = 0
                 
         except Exception as e:
             self.logger.error(f"Fehler beim Hinzufügen des Laufwerks: {str(e)}")
             
     def remove_drive(self, drive_letter: str):
-        """Entfernt ein Laufwerk.
-        
-        Args:
-            drive_letter: Buchstabe des zu entfernenden Laufwerks
-        """
+        """Entfernt ein Laufwerk."""
         try:
-            # Remove from active transfers
-            self.active_transfers.discard(drive_letter)
-            
-            # Only remove widget if no more active transfers for this drive
-            if drive_letter not in self.active_transfers:
-                if drive_letter in self.drive_widgets:
-                    # Widget aus dem Layout entfernen
-                    widget = self.drive_widgets.pop(drive_letter)
-                    self.drives_layout.removeWidget(widget)
-                    widget.deleteLater()
-                    
-                    # Bytes-Tracking entfernen
-                    self.total_bytes.pop(drive_letter, None)
-                    self.transferred_bytes.pop(drive_letter, None)
-                    
-                    # Platzhalter anzeigen wenn keine Laufwerke mehr
-                    if len(self.drive_widgets) == 0:
-                        self.placeholder_label.show()
-                        self.total_progress.setValue(0)
+            if drive_letter in self.drive_widgets:
+                # Widget entfernen
+                widget = self.drive_widgets.pop(drive_letter)
+                self.drives_layout.removeWidget(widget)
+                widget.deleteLater()
+                
+                # Tracking-Daten entfernen
+                self.total_bytes.pop(drive_letter, None)
+                self.transferred_bytes.pop(drive_letter, None)
+                
+                # Platzhalter anzeigen wenn keine Laufwerke mehr
+                if len(self.drive_widgets) == 0:
+                    self.placeholder_label.show()
+                    self.total_progress.setValue(0)
                 
         except Exception as e:
             self.logger.error(f"Fehler beim Entfernen des Laufwerks: {str(e)}")

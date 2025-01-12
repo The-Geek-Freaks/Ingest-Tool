@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QGroupBox,
     QPushButton, QLabel, QComboBox,
     QLineEdit, QCheckBox, QListWidget,
-    QWidget, QSplitter, QFrame
+    QWidget, QSplitter, QFrame, QSizePolicy
 )
 from PyQt5.QtCore import Qt
 from datetime import datetime
@@ -35,22 +35,50 @@ class MainLayout:
         self.main_window.setCentralWidget(central_widget)
         
         # Hauptlayout (Horizontal für Sidebar)
-        main_layout = QHBoxLayout()
-        main_layout.setSpacing(10)
-        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Content Layout
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(0)
+        content_layout.setContentsMargins(10, 10, 10, 10)
         
         # Linker Sidebar für verbundene Laufwerke
         sidebar_widget = QWidget()
-        sidebar_widget.setFixedWidth(250)
+        sidebar_widget.setFixedWidth(430)  
+        sidebar_widget.setStyleSheet("""
+            QWidget {
+                background-color: transparent;
+                border: 1px solid #4B5563;
+                border-radius: 4px;
+            }
+            QListWidget {
+                background-color: #2D2D2D;
+                border: none;
+            }
+        """)
         sidebar_layout = QVBoxLayout(sidebar_widget)
         sidebar_layout.setSpacing(5)
+        sidebar_layout.setContentsMargins(8, 8, 8, 8)
         
         drives_label = QLabel(" " + self.main_window.i18n.get("ui.connected_drives"))
+        drives_label.setStyleSheet("""
+            QLabel {
+                color: #E5E7EB;
+                font-weight: bold;
+                padding: 5px;
+            }
+        """)
         sidebar_layout.addWidget(drives_label)
-        sidebar_layout.addWidget(self.main_window.drives_list)
         
-        # Füge Sidebar zum Hauptlayout hinzu
-        main_layout.addWidget(sidebar_widget)
+        # DriveList soll die gesamte verfügbare Höhe ausfüllen
+        self.main_window.drives_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.main_window.drives_list.setMinimumHeight(400)  
+        sidebar_layout.addWidget(self.main_window.drives_list, stretch=1)  
+        
+        # Füge Sidebar zum Content Layout hinzu
+        content_layout.addWidget(sidebar_widget, 1)
         
         # Rechter Bereich
         right_widget = QWidget()
@@ -65,7 +93,7 @@ class MainLayout:
         
         # Gefilterte Laufwerksliste (nur Instanz, nicht im Layout)
         self.main_window.filtered_drives_list = QListWidget()
-        self.main_window.filtered_drives_list.setMaximumHeight(150)  # Höhere maximale Höhe
+        self.main_window.filtered_drives_list.setMaximumHeight(250)  
         
         # Mittlerer Bereich mit Progress Widget und DropZone
         middle_section = QWidget()
@@ -76,7 +104,7 @@ class MainLayout:
         # Progress Widget (80% Breite)
         self.main_window.progress_widget = ProgressWidget(self.main_window)
         self.main_window.progress_widget.setMinimumWidth(400)
-        self.main_window.progress_widget.setMinimumHeight(200)  # Mindesthöhe hinzugefügt
+        self.main_window.progress_widget.setMinimumHeight(400)  
         self.main_window.progress_widget.setStyleSheet("""
             QWidget {
                 background-color: #2b2b2b;
@@ -125,10 +153,16 @@ class MainLayout:
         
         right_layout.addWidget(protocol_settings_splitter)
         
+        # Füge rechten Bereich zum Content Layout hinzu
+        content_layout.addWidget(right_widget, 2)
+        
+        # Füge Content Layout zum Hauptlayout hinzu
+        main_layout.addLayout(content_layout)
+        
         # Footer
         footer_layout = QHBoxLayout()
         footer_layout.setSpacing(20)
-        footer_layout.setContentsMargins(10, 10, 0, 10)  # Reduziere den rechten Rand
+        footer_layout.setContentsMargins(10, 10, 0, 10)  
         
         # Linke Seite des Footers
         left_footer = QWidget()
@@ -157,7 +191,7 @@ class MainLayout:
         
         # Copyright
         year = datetime.now().year
-        copyright_label = QLabel(f"{year} Ingest Tool")
+        copyright_label = QLabel("Copyright TheGeekFreaks | Alexander Zuber-Jatzke")
         copyright_label.setStyleSheet("color: #666;")
         left_footer_layout.addWidget(copyright_label)
         
@@ -169,7 +203,7 @@ class MainLayout:
         # Start und Stop Buttons in einem eigenen Widget
         buttons_widget = QWidget()
         buttons_layout = QHBoxLayout(buttons_widget)
-        buttons_layout.setContentsMargins(0, 0, 10, 0)  # 10px Abstand nach rechts
+        buttons_layout.setContentsMargins(0, 0, 10, 0)  
         
         # Start und Stop Buttons
         buttons_layout.addWidget(self.main_window.start_button)
@@ -177,7 +211,7 @@ class MainLayout:
         
         # Abort Button
         self.main_window.abort_button = QPushButton("Transfer abbrechen")
-        self.main_window.abort_button.setEnabled(False)  # Initially disabled
+        self.main_window.abort_button.setEnabled(False)  
         self.main_window.abort_button.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
@@ -199,15 +233,9 @@ class MainLayout:
         
         footer_layout.addWidget(buttons_widget)
         
-        right_layout.addLayout(footer_layout)
-        
-        # Füge rechten Bereich zum Hauptlayout hinzu
-        main_layout.addWidget(right_widget, stretch=1)
-        
-        # Setze das Layout für das zentrale Widget
-        central_widget.setLayout(main_layout)
+        main_layout.addLayout(footer_layout)
         
         # Setze Fenstergröße und Titel
         self.main_window.setWindowTitle("Ingest Tool")
-        self.main_window.setMinimumSize(1024, 768)  # Minimalgröße
-        self.main_window.resize(1280, 800)  # Startgröße
+        self.main_window.setMinimumSize(1024, 768)  
+        self.main_window.resize(1280, 800)  

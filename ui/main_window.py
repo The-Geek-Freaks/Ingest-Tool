@@ -114,6 +114,13 @@ class MainWindow(QMainWindow):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
         
+        # Setze initiale Fenstergröße
+        self.resize(1440, 1230)
+        self.setMinimumSize(1200, 800)
+        
+        # Flag für erstes Anzeigen
+        self._first_show = True
+        
         # Initialisiere Attribute
         self.drive_items = {}
         self.is_watching = False
@@ -187,12 +194,12 @@ class MainWindow(QMainWindow):
         self.abort_button.setEnabled(False)
         
         # Andere Buttons
-        self.add_mapping_button = QPushButton("Hinzufügen")
-        self.remove_mapping_button = QPushButton("Entfernen")
-        self.add_excluded_button = QPushButton("Ausschließen")
-        self.remove_excluded_button = QPushButton("Entfernen")
-        self.exclude_all_button = QPushButton("Alle ausschließen")
-        self.auto_start_checkbox = QCheckBox("Automatisch starten")
+        self.add_mapping_button = QPushButton("➕ Hinzufügen")
+        self.remove_mapping_button = QPushButton("🗑️ Entfernen")
+        self.add_excluded_button = QPushButton("🚫 Ausschließen")
+        self.remove_excluded_button = QPushButton("✅ Entfernen")
+        self.exclude_all_button = QPushButton("⛔ Alle ausschließen")
+        self.auto_start_checkbox = QCheckBox("🔄 Automatisch starten")
         
         # Initialisiere Manager und Controller
         self.settings_manager = SettingsManager()
@@ -304,17 +311,26 @@ class MainWindow(QMainWindow):
             self.central_widget = QWidget()
             self.setCentralWidget(self.central_widget)
             self.central_layout = QVBoxLayout()
+            self.central_layout.setContentsMargins(8, 8, 8, 8)
+            self.central_layout.setSpacing(8)
             self.central_widget.setLayout(self.central_layout)
+            
+            # Style
+            self.setStyleSheet(StyleHelper.get_main_window_style())
+            self.central_widget.setStyleSheet(StyleHelper.get_widget_style())
 
             # Mittlerer Bereich mit Progress Widget und DropZone
             middle_layout = QHBoxLayout()
+            middle_layout.setSpacing(8)
             
             # Progress Widget (80% der Breite)
             self.progress_widget = ProgressWidget()
+            self.progress_widget.setStyleSheet(StyleHelper.get_widget_style())
             middle_layout.addWidget(self.progress_widget, stretch=8)
             
             # DropZone (20% der Breite)
             self.drop_zone = DropZone(self)
+            self.drop_zone.setStyleSheet(StyleHelper.get_widget_style())
             self.drop_zone.setMinimumWidth(200)
             middle_layout.addWidget(self.drop_zone, stretch=2)
             
@@ -322,9 +338,18 @@ class MainWindow(QMainWindow):
             
             # Buttons
             self.button_layout = QHBoxLayout()
+            self.button_layout.setSpacing(8)
+            
+            button_style = StyleHelper.get_button_style()
+            
             self.start_button = QPushButton("Start")
+            self.start_button.setStyleSheet(button_style)
+            
             self.cancel_button = QPushButton("Stop")
+            self.cancel_button.setStyleSheet(button_style)
+            
             self.target_select_button = QPushButton("Ziel wählen")
+            self.target_select_button.setStyleSheet(button_style)
             
             self.button_layout.addWidget(self.start_button)
             self.button_layout.addWidget(self.cancel_button)
@@ -332,13 +357,11 @@ class MainWindow(QMainWindow):
             
             # Laufwerksliste
             self.drive_list = QListWidget()
+            self.drive_list.setStyleSheet(StyleHelper.get_list_style())
             
             # Layout zusammenbauen
             self.central_layout.addLayout(self.button_layout)
             self.central_layout.addWidget(self.drive_list)
-            
-            # Signal-Handler verbinden
-            #self.connect_signals()
             
         except Exception as e:
             self.logger.error(f"Fehler beim Setup der UI: {e}", exc_info=True)
@@ -580,9 +603,31 @@ class MainWindow(QMainWindow):
             for i in range(self.mappings_list.count()):
                 item = self.mappings_list.item(i)
                 text = item.text()
-                if text.startswith("*."):
-                    file_type, target = text.split(" ➔ ")
-                    mappings[file_type.strip()] = target.strip()
+                self.logger.debug(f"Verarbeite Zuordnung: {text}")
+                
+                # Unterstütze beide Formate: "*.mp4 ➔ Pfad" und ".mp4 -> Pfad"
+                if "➔" in text:
+                    file_type, target_path = text.split("➔")
+                elif " -> " in text:
+                    file_type, target_path = text.split(" -> ")
+                else:
+                    continue
+                    
+                # Bereinige Dateityp
+                file_type = file_type.strip().lower()
+                if file_type.startswith("*."):
+                    file_type = "." + file_type[2:]  # Wandle "*.mp4" in ".mp4" um
+                elif not file_type.startswith("."):
+                    file_type = "." + file_type  # Stelle sicher, dass der Dateityp mit . beginnt
+                    
+                target_path = target_path.strip()
+                
+                # Füge nur gültige Zuordnungen hinzu
+                if file_type and target_path:
+                    mappings[file_type] = target_path
+                    self.logger.debug(f"Zuordnung gefunden: {file_type} -> {target_path}")
+                
+            self.logger.debug(f"Gefundene Zuordnungen: {mappings}")
             
             # Sammle ausgeschlossene Laufwerke
             excluded_drives = []
@@ -591,6 +636,8 @@ class MainWindow(QMainWindow):
                 drive = item.text().strip()
                 if drive:  # Nur nicht-leere Laufwerke hinzufügen
                     excluded_drives.append(drive)
+            
+            self.logger.debug(f"Ausgeschlossene Laufwerke: {excluded_drives}")
             
             # Aktuelle Einstellungen
             current_settings = {
@@ -1070,29 +1117,26 @@ class MainWindow(QMainWindow):
             
             # Starte Kopiervorgang für jeden Dateityp
             for file_type, type_files in files_by_type.items():
-                mapping = self.get_mapping_for_type(file_type)
+                mapping = self.get_mapping_for_type(f"*.{file_type}")
                 if mapping:
-                    target_path = mapping
+                    target_path = mapping.strip()
                     if target_path:
-                        # Erstelle Batch für diesen Dateityp
-                        batch = {
-                            'files': type_files,
-                            'target': target_path,
-                            'delete_source': self.delete_source_checkbox.isChecked()
-                        }
-                        self.batch_manager.add_batch(batch)
-                        
-            # Starte die Verarbeitung
-            if self.batch_manager.has_pending_batches():
-                self.transfer_coordinator.start_copy()
-                
+                        # Füge jeden Transfer einzeln hinzu
+                        for source_file in type_files:
+                            self.logger.info(f"Starte Transfer: {source_file}")
+                            self.logger.info(f"Datei gefunden und Transfer gestartet: {os.path.basename(source_file)}")
+                            # Nutze den file_watcher_manager für die Transfers
+                            self.file_watcher_manager.transfer_manager.transfer_file(source_file, target_path)
+            
         except Exception as e:
-            logger.error(f"Fehler beim Starten des Kopiervorgangs: {e}")
-            self.ui_handlers.show_error(
-                self.i18n.get("ui.error"),
-                str(e)
+            self.logger.error(f"Fehler beim Starten des Kopiervorgangs: {e}")
+            QMessageBox.critical(
+                self,
+                "Fehler",
+                f"Fehler beim Starten des Kopiervorgangs:\n{str(e)}",
+                QMessageBox.Ok
             )
-
+            
     def show_warning(self, title: str, message: str):
         """Zeigt eine Warnung an."""
         self.ui_handlers.show_warning(title, message)
@@ -1203,14 +1247,16 @@ class MainWindow(QMainWindow):
             
             self.logger.debug(f"Ausgeschlossene Laufwerke: {excluded_drives}")
             
-            # Gehe durch alle verbundenen Laufwerke
+            # Aktualisiere Status aller Laufwerke
             for drive_letter, drive_item in self.drive_items.items():
-                # Normalisiere Laufwerksbuchstaben für den Vergleich
                 normalized_drive = drive_letter.rstrip(':\\')
+                is_excluded = normalized_drive in excluded_drives
                 
-                # Prüfe ob das Laufwerk ausgeschlossen ist
-                if normalized_drive not in excluded_drives:
-                    # Füge das Laufwerk zur gefilterten Liste hinzu
+                # Aktualisiere den Status im DriveListItem
+                drive_item.update_excluded_status(is_excluded)
+                
+                # Füge nicht ausgeschlossene Laufwerke zur gefilterten Liste hinzu
+                if not is_excluded:
                     if hasattr(drive_item, 'label'):
                         new_item = self.filtered_drives_list.add_drive(
                             drive_letter, 
@@ -1223,6 +1269,8 @@ class MainWindow(QMainWindow):
                             new_item.drive_type = drive_item.drive_type
                         if hasattr(drive_item, 'is_mapped'):
                             new_item.is_mapped = drive_item.is_mapped
+                        if hasattr(drive_item, 'is_excluded'):
+                            new_item.is_excluded = drive_item.is_excluded
                         new_item._update_display()
             
             self.logger.debug(f"Gefilterte Laufwerksliste aktualisiert: {self.filtered_drives_list.count()} Laufwerke")
@@ -1432,21 +1480,15 @@ class MainWindow(QMainWindow):
         self.cancel_button.clicked.connect(self._on_cancel_clicked)
         self.target_select_button.clicked.connect(self._on_browse_clicked)
         
-    def _on_transfer_started(self, transfer_id: str):
-        """Handler für gestartete Transfers."""
-        try:
-            transfer = self.transfer_coordinator.get_transfer_status(transfer_id)
-            if transfer:
-                source_file = transfer.get('source_file', '')
-                drive_letter = os.path.splitdrive(source_file)[0].rstrip(':')
-                filename = os.path.basename(source_file)
-                
-                # Aktualisiere Progress Widget
-                self.progress_widget.update_drive_progress(
-                    drive_letter=drive_letter,
-                    filename=filename,
-                    progress=0,
-                    speed=0
-                )
-        except Exception as e:
-            self.logger.error(f"Fehler beim Start des Transfers: {str(e)}")
+
+    def showEvent(self, event):
+        """Wird aufgerufen, wenn das Fenster angezeigt wird."""
+        super().showEvent(event)
+        if self._first_show:
+            # Setze Position und Größe beim ersten Anzeigen
+            screen = self.screen()
+            screen_geometry = screen.geometry()
+            x = (screen_geometry.width() - 1440) // 2
+            y = (screen_geometry.height() - 1230) // 2
+            self.setGeometry(x, y, 1440, 1230)
+            self._first_show = False
