@@ -105,7 +105,7 @@ Wir freuen uns über Beiträge! Bitte beachten Sie unsere Contribution Guideline
 
 ## 📄 Lizenz
 
-MIT License - Siehe [LICENSE](LICENSE) für Details
+GPL 3.0 License - Siehe [LICENSE](LICENSE) für Details
 
 ---
 Entwickelt mit ❤️ von TheGeekFreaks
