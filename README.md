@@ -10,7 +10,7 @@
   ![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
   [![GitHub issues](https://img.shields.io/github/issues/The-Geek-Freaks/Ingest-Tool)](https://github.com/The-Geek-Freaks/Ingest-Tool/issues)
   [![GitHub stars](https://img.shields.io/github/stars/The-Geek-Freaks/Ingest-Tool)](https://github.com/The-Geek-Freaks/Ingest-Tool/stargazers)
-  [![Discord](https://img.shields.io/discord/XXXXX?label=Discord&logo=discord)](https://discord.gg/thegeekfreaks)
+  [![Discord](https://img.shields.io/discord/XXXXX?label=Discord&logo=discord)](https://tgf.click/discord)
 </div>
 
 ## 📑 Inhaltsverzeichnis
@@ -39,11 +39,11 @@
       </td>
       <td align="center">
         <img src="docs/assets/feature2.png" width="200px" /><br/>
-        <b>Schnelle Transfers</b>
+        <b>Echtzeit-Monitoring</b>
       </td>
       <td align="center">
         <img src="docs/assets/feature3.png" width="200px" /><br/>
-        <b>Echtzeit-Monitoring</b>
+        <b>Schnelle Transfers</b>
       </td>
     </tr>
   </table>
@@ -123,9 +123,9 @@ python main.py
 - [x] Drag & Drop Support
 - [x] Intelligente Dateizuordnung
 - [x] Fortschrittsanzeige
-- [ ] Cloud-Integration
-- [ ] Netzwerk-Synchronisation
-- [ ] Mobile App
+- [ ] Profi-Funktionen
+- [ ] Crossplattform
+- [ ] Rechtsklickintegration
 - [ ] API für Entwickler
 
 ## 👥 Community
