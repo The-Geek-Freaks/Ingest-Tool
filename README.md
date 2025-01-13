@@ -102,21 +102,6 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## 📚 Beispiele
-
-### Foto-Import von SD-Karte
-```json
-{
-  "mappings": {
-    "*.CR2": "D:/Fotos/RAW",
-    "*.CR3": "D:/Fotos/RAW",
-    "*.NEF": "D:/Fotos/RAW",
-    "*.JPG": "D:/Fotos/JPG",
-    "*.MP4": "D:/Videos"
-  }
-}
-```
-
 ## 🗺️ Roadmap
 
 - [x] Basis-Funktionalität
@@ -124,9 +109,32 @@ python main.py
 - [x] Intelligente Dateizuordnung
 - [x] Fortschrittsanzeige
 - [ ] Profi-Funktionen
+  - [ ] Erweiterte Filteroptionen
+  - [ ] Backup-Strategien
+  - [ ] Automatisierte Workflows
 - [ ] Crossplattform
+  - [ ] Linux Support
+  - [ ] macOS Support
 - [ ] Rechtsklickintegration
 - [ ] API für Entwickler
+
+## 🔧 Entwicklungsstatus
+
+### In Arbeit
+- **Multi-Language Support**
+  - Implementierung der Übersetzungs-Engine
+  - Vorbereitung der Sprachdateien für EN/DE
+  - Automatische Spracherkennung
+
+- **Clean-Up Projekt**
+  - Optimierung der temporären Dateiverwaltung
+  - Automatische Bereinigung nach Abschluss
+  - Verbesserte Fehlerbehandlung
+
+- **Erweiterte Funktionen**
+  - Profi-Werkzeuge für Batch-Verarbeitung
+  - Erweiterte Filtermöglichkeiten
+  - Anpassbare Workflow-Automatisierung
 
 ## 👥 Community
 
