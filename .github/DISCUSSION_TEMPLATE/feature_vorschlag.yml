@@ -1,0 +1,51 @@
+title: "💡 Feature-Vorschlag"
+labels: ["feature", "verbesserung"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für deinen Feature-Vorschlag! Wir freuen uns über neue Ideen.
+        
+  - type: textarea
+    id: beschreibung
+    attributes:
+      label: Feature-Beschreibung
+      description: Beschreibe dein gewünschtes Feature
+      placeholder: Eine detaillierte Beschreibung deiner Idee...
+    validations:
+      required: true
+      
+  - type: textarea
+    id: anwendungsfall
+    attributes:
+      label: Anwendungsfall
+      description: Wie würde das Feature in der Praxis genutzt werden?
+      placeholder: Beschreibe ein konkretes Beispiel...
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: prioritaet
+    attributes:
+      label: Priorität
+      description: Wie wichtig ist dieses Feature für dich?
+      options:
+        - Sehr wichtig
+        - Wichtig
+        - Wäre nett
+        - Nicht dringend
+    validations:
+      required: true
+      
+  - type: checkboxes
+    id: zusatzinfo
+    attributes:
+      label: Zusätzliche Informationen
+      description: Bitte bestätige folgendes
+      options:
+        - label: Ich habe geprüft, ob es bereits ähnliche Vorschläge gibt
+          required: true
+        - label: Ich würde dieses Feature aktiv nutzen
+          required: true
+        - label: Ich könnte bei der Entwicklung helfen
+          required: false

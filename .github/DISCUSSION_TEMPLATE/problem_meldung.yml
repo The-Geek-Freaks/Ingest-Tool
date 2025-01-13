@@ -1,0 +1,71 @@
+title: "🐛 Problem-Meldung"
+labels: ["problem", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Bitte nutze dieses Template für Probleme, die keine kritischen Sicherheitslücken sind.
+        Für Sicherheitsprobleme nutze bitte den Security Advisory.
+        
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problembeschreibung
+      description: Was ist das Problem?
+      placeholder: Beschreibe das Problem so detailliert wie möglich...
+    validations:
+      required: true
+      
+  - type: textarea
+    id: reproduktion
+    attributes:
+      label: Schritte zur Reproduktion
+      description: Wie kann man das Problem nachstellen?
+      value: |
+        1. Gehe zu '...'
+        2. Klicke auf '....'
+        3. Scrolle runter zu '....'
+        4. Siehe Fehler
+    validations:
+      required: true
+      
+  - type: textarea
+    id: erwartung
+    attributes:
+      label: Erwartetes Verhalten
+      description: Was hätte passieren sollen?
+    validations:
+      required: true
+      
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Falls möglich, füge Screenshots hinzu
+      
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Welche Version verwendest du?
+      placeholder: z.B. v0.1.8
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: betriebssystem
+    attributes:
+      label: Betriebssystem
+      options:
+        - Windows 11
+        - Windows 10
+        - Windows 8.1
+        - Anderes
+    validations:
+      required: true
+      
+  - type: textarea
+    id: kontext
+    attributes:
+      label: Zusätzlicher Kontext
+      description: Weitere Informationen zum Problem

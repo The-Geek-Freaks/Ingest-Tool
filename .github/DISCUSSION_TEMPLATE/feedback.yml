@@ -1,0 +1,62 @@
+title: "📝 Feedback & Erfahrungsbericht"
+labels: ["feedback", "erfahrung"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Teile deine Erfahrungen mit dem Ingest-Tool! Dein Feedback hilft uns, das Tool zu verbessern.
+        
+  - type: textarea
+    id: erfahrung
+    attributes:
+      label: Deine Erfahrung
+      description: Wie war deine Erfahrung mit dem Tool?
+      placeholder: Teile deine Eindrücke...
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: nutzungsdauer
+    attributes:
+      label: Nutzungsdauer
+      description: Wie lange nutzt du das Tool schon?
+      options:
+        - Weniger als 1 Monat
+        - 1-3 Monate
+        - 3-6 Monate
+        - Über 6 Monate
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: nutzungshaeufigkeit
+    attributes:
+      label: Nutzungshäufigkeit
+      description: Wie oft nutzt du das Tool?
+      options:
+        - Täglich
+        - Mehrmals pro Woche
+        - Wöchentlich
+        - Gelegentlich
+    validations:
+      required: true
+      
+  - type: textarea
+    id: verbesserungen
+    attributes:
+      label: Verbesserungsvorschläge
+      description: Was können wir besser machen?
+      
+  - type: textarea
+    id: highlights
+    attributes:
+      label: Highlights
+      description: Was gefällt dir besonders gut?
+      
+  - type: checkboxes
+    id: weiterempfehlung
+    attributes:
+      label: Weiterempfehlung
+      options:
+        - label: Ich würde das Tool weiterempfehlen
+        - label: Ich möchte in der Referenzliste genannt werden

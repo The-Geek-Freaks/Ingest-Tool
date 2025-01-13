@@ -4,13 +4,17 @@
   <p>Ein modernes und effizientes Dateimanagement-Tool für professionelle Dateiübertragungen zwischen Laufwerken.</p>
   <p>Optimiert für Fotografen, Videografen und Content Creator.</p>
 
+  ![Status](https://img.shields.io/badge/Status-Beta-yellow)
   ![Version](https://img.shields.io/github/v/release/The-Geek-Freaks/Ingest-Tool?include_prereleases)
   ![Python](https://img.shields.io/badge/python-3.11+-green.svg)
   ![Qt](https://img.shields.io/badge/Qt-6.5+-purple.svg)
+  ![Windows](https://img.shields.io/badge/Windows-10%2F11-blue)
   ![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
   [![GitHub issues](https://img.shields.io/github/issues/The-Geek-Freaks/Ingest-Tool)](https://github.com/The-Geek-Freaks/Ingest-Tool/issues)
   [![GitHub stars](https://img.shields.io/github/stars/The-Geek-Freaks/Ingest-Tool)](https://github.com/The-Geek-Freaks/Ingest-Tool/stargazers)
-  [![Discord](https://img.shields.io/discord/XXXXX?label=Discord&logo=discord)](https://discord.gg/thegeekfreaks)
+  ![Contributors](https://img.shields.io/github/contributors/The-Geek-Freaks/Ingest-Tool)
+  ![Downloads](https://img.shields.io/github/downloads/The-Geek-Freaks/Ingest-Tool/total)
+  [![Discord](https://img.shields.io/discord/XXXXX?label=Discord&logo=discord)](https://tgf.click/discord)
 </div>
 
 ## 📑 Inhaltsverzeichnis
@@ -39,11 +43,11 @@
       </td>
       <td align="center">
         <img src="docs/assets/feature2.png" width="200px" /><br/>
-        <b>Schnelle Transfers</b>
+        <b>Echtzeit-Monitoring</b>
       </td>
       <td align="center">
         <img src="docs/assets/feature3.png" width="200px" /><br/>
-        <b>Echtzeit-Monitoring</b>
+        <b>Schnelle Transfers</b>
       </td>
     </tr>
   </table>
@@ -52,26 +56,109 @@
 ## ✨ Hauptfunktionen
 
 ### 📁 Moderne Benutzeroberfläche
-- **Drag & Drop Support**: Einfaches Ziehen und Ablegen von Dateien mit intelligenter Dateityperkennung
-- **Dark Mode**: Augenschonende dunkle Benutzeroberfläche
-- **Responsive Design**: Dynamische Anpassung an verschiedene Fenstergrößen
+- **Drag & Drop Support**: Einfaches Ziehen und Ablegen von Dateien
+- **Dark/Light Mode**: Augenschonende Themes für Tag und Nacht
+- **Responsive Design**: Dynamische Anpassung an Fenstergrößen
 - **Intuitive Bedienung**: Klare und übersichtliche Benutzerführung
+- **Multi-Monitor Support**: Optimiert für mehrere Bildschirme
+- **Customizable Layout**: Anpassbare Arbeitsbereiche
+- **Schnellzugriff-Leiste**: Häufig genutzte Funktionen direkt erreichbar
+- **Kontextmenüs**: Rechtskick-Optionen für schnelle Aktionen
 
 ### 🔄 Intelligentes Dateimanagement
-- **Automatische Laufwerkserkennung**: Sofortige Erkennung von USB-Sticks, SD-Karten und Netzwerklaufwerken
-- **Smart-Sorting**: Automatische Sortierung und Zuordnung nach Dateitypen
-- **Echtzeit-Überwachung**: Sofortige Verarbeitung neuer Dateien
-- **Duplikaterkennung**: Intelligenter Umgang mit existierenden Dateien
-  - Überspringen identischer Dateien
-  - Automatische Umbenennung bei unterschiedlichen Dateigrößen
+- **Automatische Laufwerkserkennung**: Sofortige Erkennung von:
+  - USB-Sticks und externe Festplatten
+  - SD-Karten und Speichermedien
+  - Netzwerklaufwerke (SMB/NFS)
+  - Cloud-Speicher Integration
+- **Smart-Sorting**: Automatische Sortierung nach:
+  - Dateityp und -format
+  - Aufnahmedatum (EXIF)
+  - Projektstruktur
+  - Benutzerdefinierten Regeln
+- **Echtzeit-Überwachung**:
+  - Live-Vorschau der Dateien
+  - Automatische Verarbeitung
+  - Änderungserkennung
+  - Fehlerbenachrichtigungen
+- **Duplikaterkennung**:
+  - MD5/SHA Prüfsummen
+  - Intelligente Namensgebung
+  - Versionskontrolle
+  - Konfliktlösung
 
-### 🔄 Leistungsstarke Übertragung
-- **Sichere Transfers**: Temporäre Dateien während der Übertragung
-- **Parallele Transfers**: Mehrere Dateien gleichzeitig übertragen
-- **Fortschrittsanzeige**: Detaillierte Statusanzeige für jeden Transfer
-- **Laufwerks-Management**: Flexible Verwaltung von Quell- und Ziellaufwerken
-- **Fehlerbehandlung**: Robuste Fehlerbehandlung und Wiederaufnahme
-- **Logging**: Umfangreiche Protokollierung aller Aktivitäten
+### 🚀 Leistungsstarke Übertragung
+- **Hochgeschwindigkeits-Transfer**:
+  - Parallele Übertragungen
+  - Gepufferte Schreibvorgänge
+  - Optimierte Chunk-Größen
+  - SSD-optimierte Transfers
+- **Sicherheitsfunktionen**:
+  - Automatische Backups
+  - Checksummen-Verifikation
+  - Wiederaufnahme nach Abbruch
+  - Verschlüsselte Übertragung
+- **Fortschrittsüberwachung**:
+  - Detaillierte Statistiken
+  - Geschwindigkeitsanzeige
+  - Restzeit-Berechnung
+  - Transfer-Logs
+
+### 🛠️ Profi-Werkzeuge
+- **Batch-Verarbeitung**:
+  - Massenumbenennungen
+  - Metadaten-Bearbeitung
+  - Format-Konvertierung
+  - Filter und Sortierung
+- **Workflow-Automation**:
+  - Benutzerdefinierte Regeln
+  - Zeitgesteuerte Aufgaben
+  - Event-basierte Aktionen
+  - Makro-Aufzeichnung
+- **Datei-Analyse**:
+  - EXIF-Daten Auswertung
+  - Dateityp-Erkennung
+  - Größenanalyse
+  - Integritätsprüfung
+- **Reporting**:
+  - Transfer-Berichte
+  - Fehlerprotokolle
+  - Nutzungsstatistiken
+  - Export-Funktionen
+
+### 🔒 Sicherheit & Datenschutz
+- **Verschlüsselung**:
+  - AES-256 Verschlüsselung
+  - Sichere Übertragung
+  - Passwortschutz
+  - Schlüsselverwaltung
+- **Zugriffskontrollen**:
+  - Benutzerrechte
+  - IP-Beschränkungen
+  - Zwei-Faktor-Auth
+  - Audit-Logs
+- **Datensicherheit**:
+  - Automatische Backups
+  - Versionierung
+  - Wiederherstellung
+  - Sichere Löschung
+
+### 🌐 Netzwerk & Konnektivität
+- **Remote-Zugriff**:
+  - Web-Interface
+  - Remote-Steuerung
+  - API-Zugang
+  - Mobile App
+- **Cloud-Integration**:
+  - Google Drive
+  - Dropbox
+  - OneDrive
+  - Custom S3
+- **Netzwerk-Protokolle**:
+  - SMB/CIFS
+  - FTP/SFTP
+  - WebDAV
+  - rsync
 
 ## ⚡ Performance
 
@@ -102,31 +189,39 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## 📚 Beispiele
-
-### Foto-Import von SD-Karte
-```json
-{
-  "mappings": {
-    "*.CR2": "D:/Fotos/RAW",
-    "*.CR3": "D:/Fotos/RAW",
-    "*.NEF": "D:/Fotos/RAW",
-    "*.JPG": "D:/Fotos/JPG",
-    "*.MP4": "D:/Videos"
-  }
-}
-```
-
 ## 🗺️ Roadmap
 
 - [x] Basis-Funktionalität
 - [x] Drag & Drop Support
 - [x] Intelligente Dateizuordnung
 - [x] Fortschrittsanzeige
-- [ ] Cloud-Integration
-- [ ] Netzwerk-Synchronisation
-- [ ] Mobile App
+- [ ] Profi-Funktionen
+  - [ ] Erweiterte Filteroptionen
+  - [ ] Backup-Strategien
+  - [ ] Automatisierte Workflows
+- [ ] Crossplattform
+  - [ ] Linux Support
+  - [ ] macOS Support
+- [ ] Rechtsklickintegration
 - [ ] API für Entwickler
+
+## 🔧 Entwicklungsstatus
+
+### In Arbeit
+- **Multi-Language Support**
+  - Implementierung der Übersetzungs-Engine
+  - Vorbereitung der Sprachdateien für EN/DE
+  - Automatische Spracherkennung
+
+- **Clean-Up Projekt**
+  - Optimierung der temporären Dateiverwaltung
+  - Automatische Bereinigung nach Abschluss
+  - Verbesserte Fehlerbehandlung
+
+- **Erweiterte Funktionen**
+  - Profi-Werkzeuge für Batch-Verarbeitung
+  - Erweiterte Filtermöglichkeiten
+  - Anpassbare Workflow-Automatisierung
 
 ## 👥 Community
 

@@ -1,0 +1,49 @@
+title: "💬 Allgemeine Frage"
+labels: ["frage", "hilfe"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke, dass du eine Frage stellst! Bitte fülle die folgenden Informationen aus.
+        
+  - type: textarea
+    id: frage
+    attributes:
+      label: Deine Frage
+      description: Was möchtest du wissen?
+      placeholder: Beschreibe deine Frage so detailliert wie möglich...
+    validations:
+      required: true
+      
+  - type: input
+    id: version
+    attributes:
+      label: Ingest-Tool Version
+      description: Welche Version des Tools verwendest du?
+      placeholder: z.B. v0.1.8
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: betriebssystem
+    attributes:
+      label: Betriebssystem
+      description: Auf welchem System läuft das Tool?
+      options:
+        - Windows 11
+        - Windows 10
+        - Windows 8.1
+        - Anderes
+    validations:
+      required: true
+      
+  - type: checkboxes
+    id: voraussetzungen
+    attributes:
+      label: Voraussetzungen
+      description: Bitte bestätige folgendes
+      options:
+        - label: Ich habe in der Suche nach ähnlichen Fragen geschaut
+          required: true
+        - label: Ich habe die FAQ gelesen
+          required: true
