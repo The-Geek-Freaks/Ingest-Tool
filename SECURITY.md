@@ -64,17 +64,6 @@ Wir folgen dem Prinzip der verantwortungsvollen Offenlegung:
 5. **Veröffentlichung**: Nach Behebung wird CVE erstellt
 6. **Anerkennung**: Finder wird in Hall of Fame gelistet
 
-## 🤝 Bug Bounty Programm
-
-Für verifizierte Sicherheitslücken bieten wir:
-
-| Schweregrad | Belohnung |
-|-------------|-----------|
-| Kritisch    | 500€     |
-| Hoch        | 250€     |
-| Mittel      | 100€     |
-| Niedrig     | 50€      |
-
 ## 📋 Checkliste für Sicherheitsmeldungen
 
 ```markdown
