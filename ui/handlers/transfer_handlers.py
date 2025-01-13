@@ -42,44 +42,51 @@ class TransferHandlers:
         if drive_letter in self.main_window.drive_items:
             self.main_window.drive_items[drive_letter].set_status("ready")
             
-    def on_transfer_progress(self, source: str, target: str, current: int, total: int):
-        """Handler für Transfer-Fortschritt."""
-        # Finde das Laufwerk für die Quelldatei
-        source_drive = os.path.splitdrive(source)[0]
-        if source_drive:
-            source_drive = source_drive.rstrip(':')  # Remove colon if present
-            
-            if source_drive in self.main_window.drive_items:
-                self.main_window.drive_items[source_drive].set_status("copying", source)
+    def on_transfer_progress(self, transfer_id: str, filename: str, progress: float, speed: float, total_size: int = None, transferred: int = None):
+        """Handler für Transfer-Fortschritt.
+        
+        Args:
+            transfer_id: ID des Transfers
+            filename: Name der aktuellen Datei
+            progress: Fortschritt in Prozent (0-100)
+            speed: Geschwindigkeit in MB/s
+            total_size: Gesamtgröße in Bytes
+            transferred: Bereits übertragene Bytes
+        """
+        try:
+            # Finde das Laufwerk für die Quelldatei
+            transfer = self.main_window.transfer_coordinator.transfers.get(transfer_id)
+            if not transfer:
+                return
                 
-                # Berechne Geschwindigkeit
-                elapsed_time = max(1, time.time() - self.main_window.transfer_start_time)
-                speed = current / elapsed_time  # bytes per second
-                speed_mb = speed / (1024 * 1024)  # Convert to MB/s
+            source_drive = os.path.splitdrive(transfer['source'])[0].rstrip(':')
+            if source_drive:
+                # Aktualisiere Drive Item Status
+                if source_drive in self.main_window.drive_items:
+                    self.main_window.drive_items[source_drive].set_status("copying", filename)
                 
-                # Aktualisiere Fortschrittsanzeige mit allen Details
-                filename = os.path.basename(source)
-                percent = int((current / total) * 100) if total > 0 else 0
-                
-                # Update progress widget with all information
+                # Aktualisiere Progress Widget
                 self.main_window.progress_widget.update_drive_progress(
                     drive_letter=source_drive,
                     filename=filename,
-                    progress=percent,
-                    speed=speed_mb,
-                    total_size=total,
-                    transferred=current
+                    progress=progress,
+                    speed=speed,
+                    total_size=total_size,
+                    transferred=transferred
                 )
                 
-                # Update main window labels
-                speed_text = self._format_speed(speed)
+                # Aktualisiere Statusleiste
+                speed_text = self._format_speed(speed * 1024 * 1024)  # Convert MB/s to B/s
                 self.main_window.speed_label.setText(
                     self.main_window.i18n.get("ui.speed_format", speed=speed_text)
                 )
                 self.main_window.progress_label.setText(
                     self.main_window.i18n.get("ui.copying_file", file=filename)
                 )
-        
+                
+        except Exception as e:
+            logger.error(f"Fehler beim Aktualisieren des Fortschritts: {e}", exc_info=True)
+
     def _format_speed(self, bytes_per_second: float) -> str:
         """Formatiert eine Übertragungsgeschwindigkeit."""
         units = ['B/s', 'KB/s', 'MB/s', 'GB/s']

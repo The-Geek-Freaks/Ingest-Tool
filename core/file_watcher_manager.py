@@ -377,19 +377,36 @@ class FileWatcherManager(QObject):
         except Exception as e:
             self.logger.error(f"Fehler in _handle_file_found: {str(e)}", exc_info=True)
 
+    def _on_transfer_progress(self, filename: str, progress: float, speed: float):
+        """Handler für Transfer-Fortschritt."""
+        try:
+            if self.main_window:
+                # Hole Laufwerksbuchstaben
+                drive_letter = os.path.splitdrive(filename)[0].rstrip(':')
+                if drive_letter:
+                    # Hole Dateigröße
+                    total_size = os.path.getsize(filename)
+                    transferred = int(total_size * (progress / 100))
+                    
+                    # Aktualisiere UI
+                    self.main_window.on_progress_updated(
+                        drive_letter,  # Laufwerk
+                        os.path.basename(filename),  # Dateiname
+                        progress,  # Fortschritt in Prozent
+                        speed,  # Geschwindigkeit in MB/s
+                        total_size,  # Gesamtgröße
+                        transferred  # Übertragene Bytes
+                    )
+                    
+        except Exception as e:
+            self.logger.error(f"Fehler beim Aktualisieren des Fortschritts: {e}")
+
     def _on_transfer_started(self, filename: str):
         """Handler für gestartete Transfers."""
         self.logger.info(f"Transfer gestartet: {filename}")
         if self.main_window:
             QTimer.singleShot(0, lambda: self.main_window.log_message(
                 f"Starte Transfer: {filename}"))
-                
-    def _on_transfer_progress(self, filename: str, progress: float):
-        """Handler für Transfer-Fortschritt."""
-        self.logger.debug(f"Transfer-Fortschritt für {filename}: {progress:.1f}%")
-        if self.main_window:
-            QTimer.singleShot(0, lambda: self.main_window.update_progress(
-                filename, progress))
                 
     def _on_transfer_completed(self, filename: str):
         """Handler für abgeschlossene Transfers."""

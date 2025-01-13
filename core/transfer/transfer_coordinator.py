@@ -16,6 +16,9 @@ from queue import Queue
 
 from core.transfer.manager import TransferManager
 from core.transfer.priority import TransferPriority
+from core.transfer.chunk_manager import ChunkManager
+from core.transfer.verification import TransferVerification
+from core.transfer.progress_tracker import TransferProgress
 from core.batch_manager import BatchManager
 from core.parallel_copier import ParallelCopier
 from utils.file_system_helper import FileSystemHelper
@@ -28,6 +31,8 @@ class TransferCoordinator(QObject):
     transfer_progress = pyqtSignal(str, float)  # Transfer-ID, Fortschritt
     transfer_completed = pyqtSignal(str)  # Transfer-ID
     transfer_error = pyqtSignal(str, str)  # Transfer-ID, Fehlermeldung
+    transfer_speed = pyqtSignal(str, float)  # Transfer-ID, MB/s
+    transfer_eta = pyqtSignal(str, float)  # Transfer-ID, Sekunden
     
     def __init__(self, settings: dict = None):
         """Initialisiert den TransferCoordinator.
@@ -41,9 +46,15 @@ class TransferCoordinator(QObject):
         self.settings = settings or {}
         
         # Initialisiere Manager
+        buffer_size = self.settings.get('buffer_size', 8388608)  # 8MB Default
+        self.chunk_manager = ChunkManager(buffer_size)
+        self.verification = TransferVerification()
         self.transfer_manager = TransferManager(max_workers=4)
         self.batch_manager = BatchManager()
         self.parallel_copier = ParallelCopier()
+        
+        # Progress Tracking
+        self.progress_trackers: Dict[str, TransferProgress] = {}
         
         # Initialisiere Status
         self._is_processing = False
@@ -400,6 +411,11 @@ class TransferCoordinator(QObject):
                     # Starte Kopiervorgang
                     self.logger.info(f"Starte Kopiervorgang: {source} -> {target}")
                     
+                    # Initialisiere Progress Tracker
+                    if transfer_id not in self.progress_trackers:
+                        self.progress_trackers[transfer_id] = TransferProgress()
+                    tracker = self.progress_trackers[transfer_id]
+                    
                     # Kopiere die Datei in Blöcken und aktualisiere den Fortschritt
                     with open(source, 'rb') as src, open(target, 'wb') as dst:
                         copied = 0
@@ -414,8 +430,17 @@ class TransferCoordinator(QObject):
                             
                             # Aktualisiere Fortschritt
                             copied += len(chunk)
-                            progress = (copied / transfer['size']) * 100
+                            
+                            # Aktualisiere Tracker
+                            speed = tracker.update(copied, required_space)
+                            eta = tracker.get_eta()
+                            progress = (copied / required_space) * 100
+                            
+                            # Sende Updates
                             self.transfer_progress.emit(transfer_id, progress)
+                            self.transfer_speed.emit(transfer_id, speed)
+                            if eta is not None:
+                                self.transfer_eta.emit(transfer_id, eta)
                             
                     # Transfer erfolgreich
                     self.logger.info(f"Transfer abgeschlossen: {transfer_id}")
@@ -435,3 +460,29 @@ class TransferCoordinator(QObject):
         finally:
             self._is_processing = False
             self.logger.debug("Transfer-Warteschlange Verarbeitung beendet")
+
+    def _update_progress(self, transfer_id: str, bytes_transferred: int, total_bytes: int):
+        """Aktualisiert den Fortschritt eines Transfers.
+        
+        Args:
+            transfer_id: ID des Transfers
+            bytes_transferred: Übertragene Bytes
+            total_bytes: Gesamtgröße in Bytes
+        """
+        if transfer_id not in self.progress_trackers:
+            self.progress_trackers[transfer_id] = TransferProgress()
+            
+        tracker = self.progress_trackers[transfer_id]
+        speed = tracker.update(bytes_transferred, total_bytes)
+        
+        # Sende Fortschritt
+        progress = (bytes_transferred / total_bytes) * 100 if total_bytes > 0 else 0
+        self.transfer_progress.emit(transfer_id, progress)
+        
+        # Sende Geschwindigkeit
+        self.transfer_speed.emit(transfer_id, speed)
+        
+        # Sende ETA
+        eta = tracker.get_eta()
+        if eta is not None:
+            self.transfer_eta.emit(transfer_id, eta)

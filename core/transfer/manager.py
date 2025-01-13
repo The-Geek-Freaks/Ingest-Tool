@@ -18,13 +18,16 @@ from .analytics import TransferAnalytics
 from .priority import TransferPriority
 from .processor import TransferProcessor
 from .queue_manager import QueueManager
+from .chunk_manager import ChunkManager
+from .verification import TransferVerification
+from .progress_tracker import TransferProgress
 
 logger = logging.getLogger(__name__)
 
 class TransferManager:
     """Manager für Dateitransfers mit Prioritätswarteschlange."""
     
-    def __init__(self, max_workers=4):
+    def __init__(self, max_workers=4, chunk_manager=None, verification=None):
         self.max_workers = max_workers
         self.transfers = {}  # transfer_id -> transfer_info
         self.active_transfers = set()
@@ -34,6 +37,11 @@ class TransferManager:
         self._recursion_check = set()  # Schutz vor Rekursion
         self._lock = threading.Lock()  # Thread-Sicherheit
         self._processed_files = {}  # Dict für verarbeitete Dateien: {file_id: (size, target)}
+        
+        # Neue Komponenten
+        self.chunk_manager = chunk_manager or ChunkManager()
+        self.verification = verification or TransferVerification()
+        self.progress_trackers = {}  # transfer_id -> TransferProgress
         
         # Callbacks
         self.progress_callback = None
@@ -259,98 +267,92 @@ class TransferManager:
     def _transfer_file(self, transfer_id: str, source: str, target: str):
         """Führt den eigentlichen Dateitransfer durch."""
         try:
-            with self._lock:
-                if transfer_id in self._recursion_check:
-                    logger.warning(f"Rekursion erkannt für Transfer {transfer_id}")
-                    return
-                    
-                self._recursion_check.add(transfer_id)
+            # Initialisiere Progress Tracker
+            self.progress_trackers[transfer_id] = TransferProgress()
+            progress_tracker = self.progress_trackers[transfer_id]
             
-            transfer = self.transfers[transfer_id]
-            transfer['start_time'] = datetime.now()
-            transfer['status'] = 'copying'
-            
-            # Erstelle Zielverzeichnis falls nicht vorhanden
-            os.makedirs(os.path.dirname(target), exist_ok=True)
-            
-            # Initialisiere Transfer-Statistiken
+            # Bestimme optimale Chunk-Größe
             file_size = os.path.getsize(source)
-            chunk_size = 1024 * 1024  # 1MB
-            processed_size = 0
-            start_time = time.time()
-            last_update = start_time
-            speed_samples = []
+            chunk_size = self.chunk_manager.get_optimal_chunk_size(file_size)
             
+            # Öffne Dateien
             with open(source, 'rb') as src, open(target, 'wb') as dst:
+                bytes_copied = 0
+                start_time = time.time()
+                
+                # Kopiere in Chunks
                 while True:
                     chunk = src.read(chunk_size)
                     if not chunk:
                         break
                         
                     dst.write(chunk)
-                    processed_size += len(chunk)
+                    bytes_copied += len(chunk)
                     
-                    # Aktualisiere Statistiken
-                    current_time = time.time()
-                    if current_time - last_update >= 0.5:  # Alle 500ms updaten
-                        # Berechne Geschwindigkeit
-                        elapsed = current_time - start_time
-                        if elapsed > 0:
-                            current_speed = processed_size / elapsed
-                            speed_samples.append(current_speed)
-                            if len(speed_samples) > 10:
-                                speed_samples.pop(0)
-                            average_speed = sum(speed_samples) / len(speed_samples)
-                            
-                            # Schätze verbleibende Zeit
-                            if average_speed > 0:
-                                remaining_bytes = file_size - processed_size
-                                estimated_time = remaining_bytes / average_speed
-                            else:
-                                estimated_time = 0
-                            
-                            # Aktualisiere Transfer-Info
-                            transfer['progress'] = processed_size / file_size
-                            transfer['processed_size'] = processed_size
-                            transfer['current_speed'] = current_speed
-                            transfer['average_speed'] = average_speed
-                            transfer['estimated_time'] = estimated_time
-                            
-                            # Rufe Callback auf
-                            if self.progress_callback:
-                                self.progress_callback(transfer_id, transfer['progress'])
-                                
-                            last_update = current_time
-                            
-            # Transfer abgeschlossen
-            transfer['status'] = 'completed'
-            transfer['end_time'] = datetime.now()
-            transfer['progress'] = 1.0
-            transfer['processed_size'] = file_size
-            transfer['processed_files'] = 1
-            
-            # Speichere Datei als verarbeitet
-            file_id = self._get_file_id(source)
-            self._processed_files[file_id] = (file_size, target)
-            
-            if self.completion_callback:
-                self.completion_callback(transfer_id)
+                    # Aktualisiere Fortschritt
+                    progress = (bytes_copied / file_size) * 100
+                    speed = progress_tracker.update(bytes_copied, file_size)  # Korrekter Aufruf
+                    eta = progress_tracker.get_eta()
+                    
+                    # Aktualisiere Transfer-Info
+                    self.transfers[transfer_id].update({
+                        'progress': progress,
+                        'processed_size': bytes_copied,
+                        'current_speed': speed,
+                        'estimated_time': eta if eta is not None else 0
+                    })
+                    
+                    # Rufe Callback auf
+                    if self.progress_callback:
+                        self.progress_callback(
+                            transfer_id=transfer_id,
+                            filename=os.path.basename(source),
+                            progress=progress,
+                            speed=speed,
+                            eta=eta,
+                            total_size=file_size,
+                            processed_size=bytes_copied
+                        )
+                    
+            # Prüfe Dateiintegrität
+            if not self.verification.verify_transfer(source, target):
+                raise Exception("Dateiverifikation fehlgeschlagen")
                 
-            return True
+            # Markiere als erfolgreich
+            self._handle_transfer_complete(transfer_id, True)
             
         except Exception as e:
-            logger.error(f"Fehler beim Übertragen der Datei: {e}", exc_info=True)
-            transfer['status'] = 'failed'
-            transfer['end_time'] = datetime.now()
-            
+            logger.error(f"Fehler beim Transfer {transfer_id}: {e}", exc_info=True)
+            self._handle_transfer_complete(transfer_id, False)
             if self.error_callback:
                 self.error_callback(transfer_id, str(e))
-                
-            return False
-            
         finally:
+            # Cleanup
+            if transfer_id in self.progress_trackers:
+                del self.progress_trackers[transfer_id]
+
+    def _handle_transfer_complete(self, transfer_id: str, success: bool):
+        """Behandelt den Abschluss eines Transfers.
+        
+        Args:
+            transfer_id: ID des Transfers
+            success: True wenn erfolgreich
+        """
+        try:
             with self._lock:
-                self._recursion_check.discard(transfer_id)
+                if transfer_id in self.active_transfers:
+                    self.active_transfers.remove(transfer_id)
+                    
+                if transfer_id in self.progress_trackers:
+                    del self.progress_trackers[transfer_id]
+                    
+                if success and self.completion_callback:
+                    self.completion_callback(transfer_id)
+                elif not success and self.error_callback:
+                    self.error_callback(transfer_id, "Transfer fehlgeschlagen")
+                    
+        except Exception as e:
+            logger.error(f"Fehler beim Abschluss von Transfer {transfer_id}: {str(e)}")
 
     def _get_file_id(self, file_path: str) -> str:
         """Generiert eine eindeutige ID für eine Datei basierend auf Name und Größe.

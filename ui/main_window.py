@@ -125,6 +125,7 @@ class MainWindow(QMainWindow):
         self.drive_items = {}
         self.is_watching = False
         self.excluded_drives = []  # Liste der ausgeschlossenen Laufwerke
+        self.active_copies = {}  # Dictionary für aktive Kopiervorgänge
         
         # Initialisiere UI-Elemente
         self.drives_list = DriveList()
@@ -810,42 +811,43 @@ class MainWindow(QMainWindow):
         logger.warning(f"Laufwerk {drive_letter} wurde getrennt. "
                       f"{len(affected_tasks)} Kopiervorgänge abgebrochen.")
         
-    def on_progress_updated(self, task_id: str, progress: float, speed: float):
+    def on_progress_updated(self, drive_letter: str, filename: str, progress: float, speed: float, total_size: int = None, transferred: int = None):
         """Wird aufgerufen, wenn sich der Fortschritt eines Kopiervorgangs ändert."""
-        # Aktualisiere den Task-spezifischen Fortschritt
-        #self.progress_widget.update_task_progress(task_id, progress, speed)
-        
-        # Berechne den Gesamtfortschritt als Durchschnitt aller aktiven Tasks
-        total_progress = 0
-        total_speed = 0
-        tasks = len(self.progress_widget.progress_widgets)
-        
-        if tasks > 0:
-            # Berechne Gesamtfortschritt
-            total_progress = sum(progress for task_id, progress in self.active_copies.items()) / tasks
-            total_speed = speed  # Aktuelle Geschwindigkeit des Tasks
+        try:
+            # Aktualisiere Fortschritt im UI
+            if hasattr(self, 'progress_widget'):
+                self.progress_widget.update_drive_progress(
+                    drive_letter,
+                    filename,
+                    progress,
+                    speed,  # Geschwindigkeit in MB/s
+                    total_size,
+                    transferred
+                )
+                
+            # Aktualisiere Drive Status
+            self.update_drive_status(drive_letter, speed)
             
-            # Aktualisiere den Gesamtfortschritt
-            #self.progress_widget.update_total_progress(total_progress, total_speed)
-            
-        # Aktualisiere die Laufwerksanzeige
-        if task_id in self.active_copies:
-            source_drive = self.active_copies[task_id]["source_drive"]
-            self.update_drive_status(source_drive, speed)
-            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Aktualisieren des Fortschritts: {e}")
+
     def update_drive_status(self, drive_letter: str, speed: float):
         """Aktualisiert die Statusanzeige eines Laufwerks."""
-        active_count = sum(1 for copy in self.active_copies.values()
-                         if copy["source_drive"] == drive_letter)
-        
-        if active_count > 0:
-            speed_text = f"{speed/(1024*1024):.1f} MB/s" if speed > 1024*1024 else \
-                        f"{speed/1024:.1f} KB/s" if speed > 1024 else \
-                        f"{speed:.1f} B/s"
-            
-            status_text = f"{active_count} parallele Kopien ({speed_text})"
-            self.drives_list.update_drive_status(drive_letter, status_text)
-            
+        try:
+            # Finde alle aktiven Kopien für dieses Laufwerk
+            active_count = 0
+            if hasattr(self, 'progress_widget'):
+                # Prüfe ob das Laufwerk aktive Transfers hat
+                if drive_letter in self.progress_widget.drive_widgets:
+                    active_count = len(self.progress_widget.active_transfers)
+
+            # Aktualisiere die Laufwerksanzeige
+            if hasattr(self, 'drive_widget'):
+                self.drive_widget.update_drive_status(drive_letter, active_count, speed)
+
+        except Exception as e:
+            self.logger.error(f"Fehler beim Aktualisieren des Laufwerksstatus: {e}")
+
     def show_advanced_settings(self):
         """Zeigt den Dialog für erweiterte Einstellungen."""
         try:
@@ -1095,11 +1097,20 @@ class MainWindow(QMainWindow):
         Returns:
             Zielpfad für den Dateityp oder None wenn keine Zuordnung existiert
         """
+        # Normalisiere den Dateityp (entferne Punkt am Anfang falls vorhanden)
+        if file_type.startswith('.'):
+            file_type = file_type[1:]
+            
+        # Suche nach beiden möglichen Formaten (*.ext und .ext)
         for i in range(self.mappings_list.count()):
             item = self.mappings_list.item(i)
             text = item.text()
-            if text.startswith(file_type + " ➔ "):
-                return text.split(" ➔ ")[1]
+            # Prüfe beide Formate
+            if text.startswith(f"*.{file_type} ➔ ") or text.startswith(f".{file_type} ➔ "):
+                self.logger.debug(f"Zuordnung gefunden für {file_type}: {text}")
+                return text.split(" ➔ ")[1].strip()
+                
+        self.logger.debug(f"Keine Zuordnung gefunden für {file_type}")
         return None
 
     def start_copy_for_files(self, files: list):
@@ -1110,32 +1121,57 @@ class MainWindow(QMainWindow):
             for file_path in files:
                 _, ext = os.path.splitext(file_path)
                 if ext:
-                    file_type = ext[1:].lower()
+                    # Stelle sicher, dass der Dateityp mit Punkt beginnt
+                    file_type = f".{ext[1:].lower()}"
                     if file_type not in files_by_type:
                         files_by_type[file_type] = []
                     files_by_type[file_type].append(file_path)
             
             # Starte Kopiervorgang für jeden Dateityp
             for file_type, type_files in files_by_type.items():
-                mapping = self.get_mapping_for_type(f"*.{file_type}")
-                if mapping:
-                    target_path = mapping.strip()
-                    if target_path:
+                # Hole die Zuordnung für diesen Dateityp
+                target_dir = self.get_mapping_for_type(file_type)
+                if target_dir:
+                    target_dir = target_dir.strip()
+                    self.logger.info(f"Gefundene Zuordnung für {file_type}: {target_dir}")
+                    
+                    if target_dir:
+                        # Stelle sicher, dass das Zielverzeichnis existiert
+                        os.makedirs(target_dir, exist_ok=True)
+                        
                         # Füge jeden Transfer einzeln hinzu
                         for source_file in type_files:
-                            self.logger.info(f"Starte Transfer: {source_file}")
-                            self.logger.info(f"Datei gefunden und Transfer gestartet: {os.path.basename(source_file)}")
-                            # Nutze den file_watcher_manager für die Transfers
-                            self.file_watcher_manager.transfer_manager.transfer_file(source_file, target_path)
+                            try:
+                                # Bestimme den Zieldateipfad
+                                filename = os.path.basename(source_file)
+                                target_path = os.path.join(target_dir, filename)
+                                
+                                # Prüfe ob die Datei bereits existiert
+                                if os.path.exists(target_path):
+                                    if os.path.getsize(source_file) == os.path.getsize(target_path):
+                                        self.logger.info(f"Überspringe identische Datei: {filename}")
+                                        continue
+                                    else:
+                                        # Generiere neuen Dateinamen
+                                        base, ext = os.path.splitext(filename)
+                                        counter = 1
+                                        while os.path.exists(target_path):
+                                            new_name = f"{base} ({counter}){ext}"
+                                            target_path = os.path.join(target_dir, new_name)
+                                            counter += 1
+                                
+                                self.logger.info(f"Starte Transfer: {source_file} -> {target_path}")
+                                self.file_watcher_manager.transfer_manager.transfer_file(source_file, target_path)
+                                
+                            except Exception as e:
+                                self.logger.error(f"Fehler beim Transfer von {source_file}: {e}")
+                                self.show_error("Fehler", f"Fehler beim Transfer von {os.path.basename(source_file)}:\n{str(e)}")
+                else:
+                    self.logger.warning(f"Keine Zuordnung gefunden für Dateityp: {file_type}")
             
         except Exception as e:
             self.logger.error(f"Fehler beim Starten des Kopiervorgangs: {e}")
-            QMessageBox.critical(
-                self,
-                "Fehler",
-                f"Fehler beim Starten des Kopiervorgangs:\n{str(e)}",
-                QMessageBox.Ok
-            )
+            self.show_error("Fehler", f"Fehler beim Starten des Kopiervorgangs:\n{str(e)}")
             
     def show_warning(self, title: str, message: str):
         """Zeigt eine Warnung an."""
@@ -1492,3 +1528,20 @@ class MainWindow(QMainWindow):
             y = (screen_geometry.height() - 1230) // 2
             self.setGeometry(x, y, 1440, 1230)
             self._first_show = False
+
+    def update_drive_status(self, drive_letter: str, speed: float):
+        """Aktualisiert die Statusanzeige eines Laufwerks."""
+        try:
+            # Finde alle aktiven Kopien für dieses Laufwerk
+            active_count = 0
+            if hasattr(self, 'progress_widget'):
+                # Prüfe ob das Laufwerk aktive Transfers hat
+                if drive_letter in self.progress_widget.drive_widgets:
+                    active_count = len(self.progress_widget.active_transfers)
+
+            # Aktualisiere die Laufwerksanzeige
+            if hasattr(self, 'drive_widget'):
+                self.drive_widget.update_drive_status(drive_letter, active_count, speed)
+
+        except Exception as e:
+            self.logger.error(f"Fehler beim Aktualisieren des Laufwerksstatus: {e}")

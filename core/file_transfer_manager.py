@@ -16,7 +16,7 @@ class FileTransferManager(QObject):
     
     # Signale für Transfer-Events
     transfer_started = pyqtSignal(str)  # Dateiname
-    transfer_progress = pyqtSignal(str, float)  # Dateiname, Prozent
+    transfer_progress = pyqtSignal(str, float, float)  # Dateiname, Prozent, Geschwindigkeit in MB/s
     transfer_completed = pyqtSignal(str)  # Dateiname
     transfer_error = pyqtSignal(str, str)  # Dateiname, Fehlermeldung
     transfer_aborted = pyqtSignal()  # Signal wenn Transfers abgebrochen wurden
@@ -168,17 +168,34 @@ class FileTransferManager(QObject):
                 self.transfer_error.emit(src_path, error_msg)
                 return False
             
-            # Bestimme Zieldatei
+            # Prüfe ob die Datei bereits existiert
             filename = os.path.basename(src_path)
-            dst_path = os.path.join(dst_dir, filename)
+            existing_file = os.path.join(dst_dir, filename)
+            
+            if os.path.exists(existing_file):
+                # Prüfe ob die Dateien identisch sind
+                if self._verify_file_size(src_path, existing_file):
+                    self.logger.info(f"Datei existiert bereits und ist identisch: {existing_file}")
+                    self.transfer_progress.emit(src_path, 100.0, 0.0)
+                    self.transfer_completed.emit(src_path)
+                    return True
+                else:
+                    # Generiere neuen Zielpfad für unterschiedliche Datei
+                    dst_path = self._get_unique_target_path(dst_dir, filename)
+                    self.logger.info(f"Datei existiert mit anderer Größe, verwende: {dst_path}")
+            
+            # Erstelle temporären Zielpfad
+            temp_path = dst_path + '.tmp'
             
             # Hole Dateigröße für Fortschrittsberechnung
             total_size = os.path.getsize(src_path)
             transferred = 0
+            last_update_time = time.time()
+            last_bytes = 0
             
             # Kopiere die Datei in Blöcken
             try:
-                with open(src_path, 'rb') as src, open(dst_path, 'wb') as dst:
+                with open(src_path, 'rb') as src, open(temp_path, 'wb') as dst:
                     while True:
                         chunk = src.read(8192)  # 8KB Blöcke
                         if not chunk:
@@ -190,63 +207,95 @@ class FileTransferManager(QObject):
                         if src_path in self._active_transfers:
                             self._active_transfers[src_path]['transferred'] = transferred
                         
-                        # Berechne und emittiere Fortschritt
-                        progress = (transferred / total_size) * 100
-                        self.transfer_progress.emit(src_path, progress)
+                        # Berechne und emittiere Fortschritt und Geschwindigkeit
+                        current_time = time.time()
+                        time_diff = current_time - last_update_time
+                        if time_diff >= 0.1:  # Update alle 100ms
+                            # Berechne Geschwindigkeit in MB/s
+                            bytes_diff = transferred - last_bytes
+                            speed_mb = (bytes_diff / time_diff) / (1024 * 1024)
+                            
+                            # Berechne Fortschritt
+                            progress = (transferred / total_size) * 100
+                            
+                            # Sende Fortschritt und Geschwindigkeit
+                            self.transfer_progress.emit(src_path, progress, speed_mb)
+                            
+                            # Aktualisiere letzte Werte
+                            last_update_time = current_time
+                            last_bytes = transferred
                         
             except IOError as e:
                 error_msg = f"Fehler beim Lesen/Schreiben: {str(e)}"
                 self.logger.error(error_msg)
                 self.transfer_error.emit(src_path, error_msg)
-                if os.path.exists(dst_path):
+                if os.path.exists(temp_path):
                     try:
-                        os.remove(dst_path)
+                        os.remove(temp_path)
                     except:
                         pass
                 return False
-                        
-            # Prüfe ob die Zieldatei existiert und die gleiche Größe hat
-            if not os.path.exists(dst_path):
-                error_msg = f"Zieldatei wurde nicht erstellt: {dst_path}"
-                self.logger.error(error_msg)
-                self.transfer_error.emit(src_path, error_msg)
-                return False
-                
-            if os.path.getsize(src_path) != os.path.getsize(dst_path):
-                error_msg = f"Größenunterschied zwischen Quelle und Ziel: {src_path}"
+            
+            # Prüfe ob die temporäre Datei vollständig ist
+            if not self._verify_file_size(src_path, temp_path):
+                error_msg = "Fehler bei der Übertragung: Unvollständige Datei"
                 self.logger.error(error_msg)
                 self.transfer_error.emit(src_path, error_msg)
                 try:
-                    os.remove(dst_path)  # Lösche fehlerhafte Zieldatei
+                    os.remove(temp_path)
                 except:
                     pass
                 return False
-                
+            
+            # Benenne temporäre Datei um
+            try:
+                os.replace(temp_path, dst_path)
+            except OSError as e:
+                error_msg = f"Fehler beim Umbenennen der temporären Datei: {str(e)}"
+                self.logger.error(error_msg)
+                self.transfer_error.emit(src_path, error_msg)
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
+                return False
+            
             # Emittiere 100% Fortschritt am Ende
-            self.transfer_progress.emit(src_path, 100.0)
+            self.transfer_progress.emit(src_path, 100.0, 0.0)
             self.transfer_completed.emit(src_path)
             self.logger.info(f"Transfer erfolgreich: {dst_path}")
-            
-            # Lösche Quelldatei wenn aktiviert
-            if self.parent() and self.parent().settings.get('delete_source_files', False):
-                try:
-                    os.remove(src_path)
-                    self.logger.info(f"Quelldatei gelöscht: {src_path}")
-                except Exception as e:
-                    self.logger.error(f"Fehler beim Löschen der Quelldatei {src_path}: {str(e)}")
-            
             return True
             
         except Exception as e:
-            error_msg = f"Fehler beim Transfer: {str(e)}"
+            error_msg = f"Unerwarteter Fehler beim Transfer: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             self.transfer_error.emit(src_path, error_msg)
-            # Versuche fehlerhafte Zieldatei zu löschen
-            try:
-                if os.path.exists(dst_path):
-                    os.remove(dst_path)
-            except:
-                pass
+            return False
+
+    def _get_unique_target_path(self, target_dir: str, filename: str) -> str:
+        """Generiert einen eindeutigen Zielpfad.
+        
+        Wenn die Datei bereits existiert, wird ein Suffix angehängt.
+        Format: name (1).ext, name (2).ext, etc.
+        """
+        base_name, ext = os.path.splitext(filename)
+        target_path = os.path.join(target_dir, filename)
+        counter = 1
+        
+        while os.path.exists(target_path):
+            new_name = f"{base_name} ({counter}){ext}"
+            target_path = os.path.join(target_dir, new_name)
+            counter += 1
+            
+        return target_path
+        
+    def _verify_file_size(self, source: str, target: str) -> bool:
+        """Überprüft, ob die Dateigröße von Quelle und Ziel übereinstimmt."""
+        try:
+            source_size = os.path.getsize(source)
+            target_size = os.path.getsize(target)
+            return source_size == target_size
+        except OSError:
             return False
             
     def _ensure_dir_exists(self, directory: str) -> bool:
@@ -258,30 +307,6 @@ class FileTransferManager(QObject):
             self.logger.error(f"Fehler beim Erstellen des Verzeichnisses {directory}: {e}")
             return False
     
-    def _verify_file_size(self, source: str, target: str) -> bool:
-        """Überprüft, ob die Dateigröße von Quelle und Ziel übereinstimmt."""
-        try:
-            source_size = os.path.getsize(source)
-            target_size = os.path.getsize(target)
-            return source_size == target_size
-        except Exception as e:
-            self.logger.error(f"Fehler beim Größenvergleich: {e}")
-            return False
-    
-    def _get_unique_target_path(self, target_dir: str, filename: str) -> str:
-        """Generiert einen eindeutigen Zielpfad."""
-        base_path = os.path.join(target_dir, filename)
-        if not os.path.exists(base_path):
-            return base_path
-            
-        name, ext = os.path.splitext(filename)
-        counter = 1
-        while True:
-            new_path = os.path.join(target_dir, f"{name}({counter}){ext}")
-            if not os.path.exists(new_path):
-                return new_path
-            counter += 1
-            
     def stop(self):
         """Stoppt den Transfer-Thread."""
         self._running = False

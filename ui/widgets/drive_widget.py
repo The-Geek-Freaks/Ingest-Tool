@@ -212,3 +212,25 @@ class DriveWidget(QWidget):
             """)
         else:
             self.setStyleSheet("")
+            
+    def update_drive_status(self, drive_letter: str, active_count: int, speed: float):
+        """Aktualisiert den Status eines Laufwerks."""
+        try:
+            # Formatiere Geschwindigkeit
+            if speed > 0:
+                speed_text = f"{speed:.1f} MB/s"  # Speed ist bereits in MB/s
+            else:
+                speed_text = "0 B/s"
+            
+            # Erstelle Statustext
+            if active_count > 0:
+                status_text = f"{active_count} {'Kopie' if active_count == 1 else 'Kopien'} ({speed_text})"
+            else:
+                status_text = "Bereit"
+            
+            # Aktualisiere Label
+            if drive_letter in self.drive_labels:
+                self.drive_labels[drive_letter].setText(status_text)
+                
+        except Exception as e:
+            logging.error(f"Fehler beim Aktualisieren des Laufwerksstatus: {e}")

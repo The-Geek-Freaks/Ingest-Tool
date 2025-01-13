@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 import logging
+import time
 
 class DriveProgress(QWidget):
     """Widget zur Anzeige des Fortschritts für ein einzelnes Laufwerk."""
@@ -18,68 +19,165 @@ class DriveProgress(QWidget):
         super().__init__(parent)
         self.drive_letter = drive_letter
         self.drive_name = drive_name
+        self._current_progress = 0
+        self._current_speed = 0
+        self._last_update = 0
+        self._update_interval = 0.1  # 100ms minimales Update-Intervall
         self._setup_ui()
         
     def _setup_ui(self):
         """Erstellt das UI für das Widget."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(3, 2, 3, 2)  # Etwas mehr horizontal
+        layout.setSpacing(3)  # Mehr Zeilenabstand
         
-        # Obere Zeile mit Laufwerksname und Geschwindigkeit
+        # Frame für besseres Aussehen
+        frame = QFrame()
+        frame.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
+        frame.setStyleSheet("""
+            QFrame {
+                background-color: #2d2d2d;
+                border: 1px solid #3d3d3d;
+                border-radius: 3px;
+            }
+        """)
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setContentsMargins(8, 4, 8, 4)  # Mehr Innenabstand
+        frame_layout.setSpacing(3)  # Mehr Abstand zwischen Elementen
+        
+        # Obere Zeile: Laufwerk, Datei und Status
         top_row = QHBoxLayout()
+        top_row.setSpacing(6)  # Mehr Abstand zwischen Elementen
         
-        # Laufwerksname
+        # Laufwerksicon und Name
+        drive_layout = QHBoxLayout()
+        drive_layout.setSpacing(4)
+        
+        drive_icon = QLabel("💾")
+        drive_icon.setStyleSheet("font-size: 12px;")  # Größeres Icon
+        drive_layout.addWidget(drive_icon)
+        
         self.name_label = QLabel(self.drive_name)
-        self.name_label.setStyleSheet("font-weight: bold;")
-        top_row.addWidget(self.name_label)
+        self.name_label.setStyleSheet("font-weight: bold; color: #ffffff; font-size: 11px;")
+        drive_layout.addWidget(self.name_label)
         
-        # Geschwindigkeit (rechtsbündig)
+        top_row.addLayout(drive_layout)
+        
+        # Dateiname
+        self.file_label = QLabel()
+        self.file_label.setStyleSheet("color: #aaaaaa; font-size: 11px;")  # Größere Schrift
+        top_row.addWidget(self.file_label, stretch=1)
+        
+        # Größe und Geschwindigkeit
+        info_layout = QHBoxLayout()
+        info_layout.setSpacing(8)  # Mehr Abstand
+        
+        self.size_label = QLabel()
+        self.size_label.setStyleSheet("color: #aaaaaa; font-size: 11px;")  # Größere Schrift
+        self.size_label.setAlignment(Qt.AlignRight)
+        info_layout.addWidget(self.size_label)
+        
         self.speed_label = QLabel()
+        self.speed_label.setStyleSheet("color: #aaaaaa; font-size: 11px;")  # Größere Schrift
         self.speed_label.setAlignment(Qt.AlignRight)
-        self.speed_label.setMinimumWidth(120)  # Fixed width for speed
-        top_row.addWidget(self.speed_label)
+        info_layout.addWidget(self.speed_label)
         
-        layout.addLayout(top_row)
+        top_row.addLayout(info_layout)
+        frame_layout.addLayout(top_row)
         
-        # Untere Zeile mit Fortschrittsbalken und Dateiname
+        # Untere Zeile: Fortschritt und ETA
         bottom_row = QHBoxLayout()
+        bottom_row.setSpacing(8)
         
         # Fortschrittsbalken
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(True)
         self.progress_bar.setAlignment(Qt.AlignCenter)
+        self.progress_bar.setFixedHeight(16)  # Höherer Fortschrittsbalken
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #555555;
+                border-radius: 2px;
+                background-color: #1e1e1e;
+                color: white;
+                text-align: center;
+                font-size: 11px;
+                margin: 0px;
+                padding: 0px;
+            }
+            QProgressBar::chunk {
+                background-color: #2196F3;
+                border-radius: 1px;
+            }
+        """)
         bottom_row.addWidget(self.progress_bar, stretch=1)
         
-        layout.addLayout(bottom_row)
+        # ETA
+        self.eta_label = QLabel()
+        self.eta_label.setStyleSheet("color: #aaaaaa; font-size: 11px;")  # Größere Schrift
+        self.eta_label.setAlignment(Qt.AlignRight)
+        self.eta_label.setFixedWidth(90)  # Etwas mehr Platz für ETA
+        bottom_row.addWidget(self.eta_label)
         
-        # Dateiname
-        self.file_label = QLabel()
-        self.file_label.setAlignment(Qt.AlignLeft)
-        layout.addWidget(self.file_label)
+        frame_layout.addLayout(bottom_row)
+        layout.addWidget(frame)
+        
+        # Setze maximale Höhe für das gesamte Widget
+        self.setMaximumHeight(52)  # Etwas mehr Höhe
         
     def update_progress(self, filename: str, progress: float, speed: float):
         """Aktualisiert den Fortschritt."""
         try:
-            # Update progress bar
-            self.progress_bar.setValue(int(progress))
+            # Rate-Limiting für Updates
+            current_time = time.time()
+            if current_time - self._last_update < self._update_interval:
+                return
             
-            # Format speed for display
-            if speed >= 1024:  # More than 1024 MB/s
-                speed_text = f"{speed/1024:.1f} GB/s"
-            else:
-                speed_text = f"{speed:.1f} MB/s"
-            self.speed_label.setText(speed_text)
+            # Speichere aktuelle Werte
+            self._current_progress = progress
+            self._current_speed = speed
+            self._last_update = current_time
             
-            # Update filename (truncate if too long)
-            max_length = 50
+            # Aktualisiere UI
+            # Kürze Dateinamen wenn zu lang
+            max_length = 40
             if len(filename) > max_length:
                 display_name = filename[:max_length-3] + "..."
             else:
                 display_name = filename
             self.file_label.setText(display_name)
             
+            # Aktualisiere Fortschrittsbalken
+            self.progress_bar.setValue(int(progress))
+            
+            # Formatiere Geschwindigkeit (speed ist bereits in MB/s)
+            if speed > 0:
+                speed_text = f"🚀 {speed:.1f} MB/s"
+            else:
+                speed_text = "🚀 0 B/s"
+            self.speed_label.setText(speed_text)
+            
+            # Berechne und zeige ETA
+            if speed > 0 and progress < 100:
+                remaining_percent = 100 - progress
+                # Geschwindigkeit ist in MB/s, also multipliziere mit 1.024 für genauere Zeit
+                remaining_time = (remaining_percent / speed) * 1.024
+                
+                if remaining_time < 60:
+                    eta_text = f"⏱️ {int(remaining_time)}s"
+                elif remaining_time < 3600:
+                    eta_text = f"⏱️ {int(remaining_time/60)}min"
+                else:
+                    eta_text = f"⏱️ {remaining_time/3600:.1f}h"
+            else:
+                if progress >= 100:
+                    eta_text = "⏱️ Fertig"
+                else:
+                    eta_text = "⏱️ Berechne..."
+            self.eta_label.setText(eta_text)
+            
         except Exception as e:
-            logger.error(f"Fehler beim Aktualisieren des Fortschritts: {e}")
+            logging.error(f"Fehler beim Aktualisieren des Fortschritts: {e}")
 
 
 class ProgressWidget(QWidget):
@@ -89,12 +187,14 @@ class ProgressWidget(QWidget):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.drive_widgets = {}
-        self.total_bytes = {}  # Track total bytes for each drive
-        self.transferred_bytes = {}  # Track transferred bytes for each drive
-        self.active_transfers = set()  # Track active transfers
+        self.total_bytes = {}  
+        self.transferred_bytes = {}  
+        self.active_transfers = set()
+        self._last_update = {}  # Zeitstempel des letzten Updates pro Laufwerk
+        self._update_interval = 0.1  # Minimales Update-Intervall in Sekunden
         
         self._setup_ui()
-        
+
     def _setup_ui(self):
         """Erstellt die UI-Komponenten."""
         # Hauptlayout
@@ -120,10 +220,10 @@ class ProgressWidget(QWidget):
         header_layout.addWidget(title)
         
         # Gesamtfortschritt
-        self.total_progress = QProgressBar()
-        self.total_progress.setRange(0, 100)
-        self.total_progress.setValue(0)
-        self.total_progress.setStyleSheet("""
+        self.total_progress_bar = QProgressBar()
+        self.total_progress_bar.setRange(0, 100)
+        self.total_progress_bar.setValue(0)
+        self.total_progress_bar.setStyleSheet("""
             QProgressBar {
                 background-color: #374151;
                 border: 1px solid #4B5563;
@@ -137,7 +237,7 @@ class ProgressWidget(QWidget):
                 border-radius: 3px;
             }
         """)
-        header_layout.addWidget(self.total_progress)
+        header_layout.addWidget(self.total_progress_bar)
         main_layout.addWidget(header_widget)
         
         # Container für die Laufwerke
@@ -243,7 +343,7 @@ class ProgressWidget(QWidget):
                 # Platzhalter anzeigen wenn keine Laufwerke mehr
                 if len(self.drive_widgets) == 0:
                     self.placeholder_label.show()
-                    self.total_progress.setValue(0)
+                    self.total_progress_bar.setValue(0)
                 
         except Exception as e:
             self.logger.error(f"Fehler beim Entfernen des Laufwerks: {str(e)}")
@@ -262,24 +362,55 @@ class ProgressWidget(QWidget):
             transferred: Bereits übertragene Bytes
         """
         try:
-            if drive_letter in self.drive_widgets:
-                # Update drive widget
-                self.drive_widgets[drive_letter].update_progress(
-                    filename, progress, speed
-                )
+            # Prüfe Update-Intervall
+            current_time = time.time()
+            if drive_letter in self._last_update:
+                if current_time - self._last_update[drive_letter] < self._update_interval:
+                    return  # Zu früh für ein Update
+            
+            # Aktualisiere Zeitstempel
+            self._last_update[drive_letter] = current_time
+            
+            # Aktualisiere Bytes-Zähler
+            if total_size is not None:
+                self.total_bytes[drive_letter] = total_size
+            if transferred is not None:
+                self.transferred_bytes[drive_letter] = transferred
+            
+            # Hole oder erstelle Drive-Widget
+            if drive_letter not in self.drive_widgets:
+                self.add_drive(drive_letter)
+            drive_widget = self.drive_widgets[drive_letter]
+            
+            # Aktualisiere aktive Transfers
+            if progress < 100:
+                self.active_transfers.add(drive_letter)
+            else:
+                self.active_transfers.discard(drive_letter)
+            
+            # Aktualisiere Drive-Widget
+            drive_widget.update_progress(filename, progress, speed)
+            
+            # Aktualisiere Gesamtfortschritt
+            self._update_total_progress()
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Aktualisieren des Fortschritts: {e}")
+            
+    def _update_total_progress(self):
+        """Aktualisiert den Gesamtfortschritt."""
+        try:
+            total_transferred = sum(self.transferred_bytes.values())
+            total_size = sum(self.total_bytes.values())
+            
+            if total_size > 0:
+                total_progress = (total_transferred / total_size) * 100
+            else:
+                total_progress = 0
                 
-                # Update byte tracking if provided
-                if total_size is not None:
-                    self.total_bytes[drive_letter] = total_size
-                if transferred is not None:
-                    self.transferred_bytes[drive_letter] = transferred
-                
-                # Calculate total progress
-                total_bytes_sum = sum(self.total_bytes.values())
-                if total_bytes_sum > 0:
-                    transferred_bytes_sum = sum(self.transferred_bytes.values())
-                    total_progress = (transferred_bytes_sum / total_bytes_sum) * 100
-                    self.total_progress.setValue(int(total_progress))
+            # Aktualisiere Gesamtfortschrittsanzeige
+            if hasattr(self, 'total_progress_bar'):
+                self.total_progress_bar.setValue(int(total_progress))
                 
         except Exception as e:
-            self.logger.error(f"Fehler beim Aktualisieren des Laufwerks: {str(e)}")
+            self.logger.error(f"Fehler beim Aktualisieren des Gesamtfortschritts: {e}")
