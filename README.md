@@ -114,7 +114,6 @@
   - Benutzerdefinierte Regeln
   - Zeitgesteuerte Aufgaben
   - Event-basierte Aktionen
-  - Makro-Aufzeichnung
 - **Datei-Analyse**:
   - EXIF-Daten Auswertung
   - Dateityp-Erkennung
@@ -126,39 +125,6 @@
   - Nutzungsstatistiken
   - Export-Funktionen
 
-### 🔒 Sicherheit & Datenschutz
-- **Verschlüsselung**:
-  - AES-256 Verschlüsselung
-  - Sichere Übertragung
-  - Passwortschutz
-  - Schlüsselverwaltung
-- **Zugriffskontrollen**:
-  - Benutzerrechte
-  - IP-Beschränkungen
-  - Zwei-Faktor-Auth
-  - Audit-Logs
-- **Datensicherheit**:
-  - Automatische Backups
-  - Versionierung
-  - Wiederherstellung
-  - Sichere Löschung
-
-### 🌐 Netzwerk & Konnektivität
-- **Remote-Zugriff**:
-  - Web-Interface
-  - Remote-Steuerung
-  - API-Zugang
-  - Mobile App
-- **Cloud-Integration**:
-  - Google Drive
-  - Dropbox
-  - OneDrive
-  - Custom S3
-- **Netzwerk-Protokolle**:
-  - SMB/CIFS
-  - FTP/SFTP
-  - WebDAV
-  - rsync
 
 ## ⚡ Performance
 
