@@ -9,23 +9,68 @@ from PyQt5.QtWidgets import (
     QTextEdit, QVBoxLayout, QMenu, QFileDialog, 
     QInputDialog, QMessageBox
 )
-from PyQt5.QtGui import QTextCharFormat, QBrush, QColor, QTextCursor
-from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QTextCharFormat, QBrush, QColor
+from PyQt5.QtCore import Qt, QObject, pyqtSignal
 
 from config.constants import LOG_VERZEICHNIS, LOG_DATEI
 
 # Erstelle Log-Verzeichnis falls nicht vorhanden
 os.makedirs(LOG_VERZEICHNIS, exist_ok=True)
 
-# Logging-Konfiguration
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(LOG_DATEI, encoding='utf-8'),
-        logging.StreamHandler()
-    ]
-)
+class ThreadSafeLogBridge(QObject):
+    """Thread-sichere Brücke für Logging-Nachrichten."""
+    
+    log_message_received = pyqtSignal(str, QTextCharFormat)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+class QTextEditLogHandler(logging.Handler):
+    """Ein angepasster Handler für QTextEdit mit Formatierung."""
+
+    def __init__(self, parent=None):
+        super().__init__()
+        self.widget = QTextEdit(parent)
+        self.widget.setReadOnly(True)
+        
+        # Erstelle Thread-Bridge
+        self.bridge = ThreadSafeLogBridge(self.widget)
+        self.bridge.log_message_received.connect(self._append_text)
+        
+        # Format für verschiedene Log-Level
+        self.formats = {
+            logging.DEBUG: self._create_format(QColor("#666666")),  # Grau
+            logging.INFO: self._create_format(QColor("#000000")),   # Schwarz
+            logging.WARNING: self._create_format(QColor("#FFA500")), # Orange
+            logging.ERROR: self._create_format(QColor("#FF0000")),   # Rot
+            logging.CRITICAL: self._create_format(QColor("#FF0000"), True)  # Rot, fett
+        }
+
+    def _create_format(self, color, bold=False):
+        """Erstellt ein QTextCharFormat mit der angegebenen Farbe."""
+        fmt = QTextCharFormat()
+        fmt.setForeground(QBrush(color))
+        if bold:
+            fmt.setFontWeight(75)  # Bold
+        return fmt
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            fmt = self.formats.get(record.levelno, self.formats[logging.INFO])
+            self.bridge.log_message_received.emit(msg, fmt)
+        except Exception:
+            self.handleError(record)
+
+    def _append_text(self, msg, fmt):
+        """Fügt formatierten Text thread-sicher hinzu."""
+        # Setze das Format
+        self.widget.setCurrentCharFormat(fmt)
+        # Füge Text hinzu
+        self.widget.append(msg)
+        # Scrolle zum Ende
+        scrollbar = self.widget.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
 class ProtokollWidget(QTextEdit):
     """Erweitertes QTextEdit für formatierte Protokollausgabe."""
@@ -38,7 +83,7 @@ class ProtokollWidget(QTextEdit):
     
     # Farben für verschiedene Log-Level
     LEVEL_COLORS = {
-        INFO: "#89d0ff",      # Helles Blau
+        INFO: "#89d0ff",      # Heltes Blau
         WARNING: "#ffd700",   # Gold
         ERROR: "#ff6b6b",     # Rot
         DEBUG: "#98c379",     # Grün
@@ -73,6 +118,41 @@ class ProtokollWidget(QTextEdit):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
 
+        # Logging-Konfiguration
+        self.logger = logging.getLogger()
+        self.logger.setLevel(logging.DEBUG)
+        
+        # Formatierung
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        
+        # Console Handler
+        console = logging.StreamHandler()
+        console.setLevel(logging.INFO)
+        console.setFormatter(formatter)
+        self.logger.addHandler(console)
+        
+        # File Handler
+        if not os.path.exists(LOG_VERZEICHNIS):
+            os.makedirs(LOG_VERZEICHNIS)
+            
+        log_file = os.path.join(LOG_VERZEICHNIS, f"app_{datetime.now():%Y-%m-%d}.log")
+        file_handler = logging.handlers.RotatingFileHandler(
+            log_file,
+            maxBytes=10*1024*1024,  # 10 MB
+            backupCount=5
+        )
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+        
+        # QTextEditLogHandler
+        self.text_edit_handler = QTextEditLogHandler(self)
+        self.text_edit_handler.setFormatter(formatter)
+        self.logger.addHandler(self.text_edit_handler)
+
     def log(self, text: str, level: str = INFO, details: dict = None):
         """Fügt einen formatierten Log-Eintrag hinzu."""
         if len(self.log_entries) >= self.max_entries:
@@ -94,43 +174,7 @@ class ProtokollWidget(QTextEdit):
                 self.group_entries[self.current_group] = []
             self.group_entries[self.current_group].append(entry)
         
-        self._append_formatted_entry(entry)
-
-    def _append_formatted_entry(self, entry):
-        """Fügt einen formatierten Log-Eintrag hinzu."""
-        cursor = self.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        
-        # Format für Zeitstempel
-        format_time = QTextCharFormat()
-        format_time.setForeground(QColor("#808080"))
-        cursor.insertText(f"[{entry['timestamp']}] ", format_time)
-        
-        # Format für Level
-        format_level = QTextCharFormat()
-        format_level.setForeground(QColor(self.LEVEL_COLORS.get(entry['level'], "#ffffff")))
-        cursor.insertText(f"[{entry['level']}] ", format_level)
-        
-        # Format für Gruppe
-        if entry['group']:
-            format_group = QTextCharFormat()
-            format_group.setForeground(QColor("#0078d4"))
-            cursor.insertText(f"[{entry['group']}] ", format_group)
-        
-        # Format für Text
-        format_text = QTextCharFormat()
-        format_text.setForeground(QColor("#ffffff"))
-        cursor.insertText(f"{entry['text']}\n", format_text)
-        
-        # Details hinzufügen
-        if entry['details']:
-            format_details = QTextCharFormat()
-            format_details.setForeground(QColor("#808080"))
-            for key, value in entry['details'].items():
-                cursor.insertText(f"  {key}: {value}\n", format_details)
-        
-        self.setTextCursor(cursor)
-        self.ensureCursorVisible()
+        self.logger.log(getattr(logging, level), text)
 
     def _show_context_menu(self, position):
         """Zeigt das Kontextmenü an der angegebenen Position."""
@@ -250,7 +294,7 @@ class ProtokollWidget(QTextEdit):
         # Aktualisiere die Anzeige
         self.clear()
         for entry in self.log_entries:
-            self._append_formatted_entry(entry)
+            self.log(entry['text'], entry['level'], entry['details'])
         
         # Markiere den gefundenen Text
         cursor = self.textCursor()

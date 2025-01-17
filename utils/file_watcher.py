@@ -35,6 +35,7 @@ class FileWatcher:
         self._callbacks = {}
         self._running = False
         self._thread = None
+        self._known_files = {}  # Persistente Liste der bekannten Dateien
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
         self.logger.info(f"FileWatcher initialisiert für {path} mit Typen {self.file_types}")
@@ -71,7 +72,6 @@ class FileWatcher:
         
     def _watch_directory(self):
         """Überwacht das Verzeichnis auf neue oder geänderte Dateien."""
-        known_files = {}  # Pfad -> Änderungszeit
         self.logger.debug(f"Starte Verzeichnisüberwachung in Thread: {threading.current_thread().name}")
         
         while self._running:
@@ -98,21 +98,25 @@ class FileWatcher:
                                 current_files[filepath] = mtime
                                 
                                 # Prüfe ob Datei neu oder geändert
-                                if filepath not in known_files:
+                                if filepath not in self._known_files:
                                     # Neue Datei
                                     self.logger.info(f"Neue Datei gefunden: {filepath}")
                                     self.on_file_found(filepath)
-                                elif mtime > known_files[filepath]:
+                                    self._known_files[filepath] = mtime
+                                elif mtime > self._known_files[filepath]:
                                     # Geänderte Datei
                                     self.logger.info(f"Geänderte Datei gefunden: {filepath}")
                                     self.on_file_found(filepath)
+                                    self._known_files[filepath] = mtime
                                     
                             except OSError as e:
                                 self.logger.error(f"Fehler beim Zugriff auf {filepath}: {str(e)}")
                                 continue
                                 
-                # Aktualisiere bekannte Dateien
-                known_files = current_files
+                # Entferne nicht mehr existierende Dateien
+                for filepath in list(self._known_files.keys()):
+                    if filepath not in current_files:
+                        del self._known_files[filepath]
                 
                 # Warte bis zum nächsten Scan
                 time.sleep(self.poll_interval)
@@ -187,7 +191,7 @@ class FileWatcher:
         """Hook-Methode für abgeleitete Klassen."""
         self._on_file_found(file_path)
 
-class SignalFileWatcher(QObject):
+class SignalFileWatcher(QObject, FileWatcher):
     """FileWatcher der Signale für gefundene Dateien ausgibt."""
     
     file_found = pyqtSignal(str)
@@ -200,41 +204,16 @@ class SignalFileWatcher(QObject):
             file_types: Liste der zu überwachenden Dateitypen
             poll_interval: Zeit zwischen Scans in Sekunden
         """
-        super().__init__()
+        QObject.__init__(self)
+        FileWatcher.__init__(self, path, file_types, poll_interval)
         self.logger = logging.getLogger(__name__)
         
-        # Erstelle FileWatcher
-        self.watcher = FileWatcher(path, file_types, poll_interval)
-        self.watcher.add_callback('signal', self._emit_signal)
-        
-        # Thread für Überwachung
-        self._thread = None
-        self._running = False
-        
-    def start(self):
-        """Startet die Überwachung."""
-        if self._running:
-            return
-            
-        self._running = True
-        self.watcher.start()
-        self.logger.info("SignalFileWatcher gestartet")
-        
-    def stop(self):
-        """Stoppt die Überwachung."""
-        self._running = False
-        if self.watcher:
-            self.watcher.stop()
-        self.logger.info("SignalFileWatcher gestoppt")
-        
-    def _emit_signal(self, file_path: str):
+    def on_file_found(self, file_path: str):
         """Sendet das file_found Signal."""
-        try:
-            self.file_found.emit(file_path)
-            self.logger.debug(f"Signal für {file_path} gesendet")
-        except Exception as e:
-            self.logger.error(f"Fehler beim Senden des Signals: {str(e)}", exc_info=True)
-
+        self.logger.debug(f"Emittiere file_found Signal für {file_path}")
+        self.file_found.emit(file_path)
+        super().on_file_found(file_path)
+        
 class FileWatcherManager:
     """Verwaltet mehrere FileWatcher für verschiedene Laufwerke."""
     

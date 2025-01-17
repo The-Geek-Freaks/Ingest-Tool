@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,9 @@ class TransferHandlers:
             self.main_window.drive_items[drive_letter].set_status("copying")
             self.main_window.transfer_start_time = time.time()
             # Add drive to progress widget when transfer starts
-            drive_name = f"Laufwerk {drive_letter}"
+            drive_name = self.main_window.drive_items[drive_letter].drive_name
+            if not drive_name:
+                drive_name = f"Laufwerk ({drive_letter}:)"
             self.main_window.progress_widget.add_drive(drive_letter, drive_name)
         
     def on_transfer_completed(self, drive_letter: str):
@@ -42,61 +45,59 @@ class TransferHandlers:
         if drive_letter in self.main_window.drive_items:
             self.main_window.drive_items[drive_letter].set_status("ready")
             
-    def on_transfer_progress(self, transfer_id: str, filename: str, progress: float, speed: float, total_size: int = None, transferred: int = None):
-        """Handler für Transfer-Fortschritt.
+    def handle_transfer_progress(self, transfer_id: str, progress: float, speed: float):
+        """Behandelt Fortschrittsupdates von Transfers.
         
         Args:
-            transfer_id: ID des Transfers
-            filename: Name der aktuellen Datei
+            transfer_id: ID des Transfers (Format: "source->target")
             progress: Fortschritt in Prozent (0-100)
-            speed: Geschwindigkeit in MB/s
-            total_size: Gesamtgröße in Bytes
-            transferred: Bereits übertragene Bytes
+            speed: Geschwindigkeit in Bytes pro Sekunde
         """
         try:
-            # Finde das Laufwerk für die Quelldatei
-            transfer = self.main_window.transfer_coordinator.transfers.get(transfer_id)
-            if not transfer:
-                return
-                
-            source_drive = os.path.splitdrive(transfer['source'])[0].rstrip(':')
-            if source_drive:
-                # Aktualisiere Drive Item Status
-                if source_drive in self.main_window.drive_items:
-                    self.main_window.drive_items[source_drive].set_status("copying", filename)
-                
-                # Aktualisiere Progress Widget
-                self.main_window.progress_widget.update_drive_progress(
-                    drive_letter=source_drive,
-                    filename=filename,
-                    progress=progress,
-                    speed=speed,
-                    total_size=total_size,
-                    transferred=transferred
-                )
-                
-                # Aktualisiere Statusleiste
-                speed_text = self._format_speed(speed * 1024 * 1024)  # Convert MB/s to B/s
-                self.main_window.speed_label.setText(
-                    self.main_window.i18n.get("ui.speed_format", speed=speed_text)
-                )
-                self.main_window.progress_label.setText(
-                    self.main_window.i18n.get("ui.copying_file", file=filename)
-                )
-                
-        except Exception as e:
-            logger.error(f"Fehler beim Aktualisieren des Fortschritts: {e}", exc_info=True)
-
-    def _format_speed(self, bytes_per_second: float) -> str:
-        """Formatiert eine Übertragungsgeschwindigkeit."""
-        units = ['B/s', 'KB/s', 'MB/s', 'GB/s']
-        unit_index = 0
-        
-        while bytes_per_second >= 1024 and unit_index < len(units) - 1:
-            bytes_per_second /= 1024
-            unit_index += 1
+            # Extrahiere Quelldatei aus Transfer-ID
+            source = transfer_id.split('->')[0]
+            filename = os.path.basename(source)
             
-        return f"{bytes_per_second:.1f} {units[unit_index]}"
+            # Ermittle Laufwerk und Namen
+            drive_letter = os.path.splitdrive(source)[0].rstrip(':')
+            if drive_letter in self.main_window.drive_items:
+                drive_item = self.main_window.drive_items[drive_letter]
+                drive_name = drive_item.drive_name
+            else:
+                drive_name = f"Laufwerk ({drive_letter}:)"
+            
+            # Hole Dateigrößen
+            if os.path.exists(source):
+                total_bytes = os.path.getsize(source)
+                transferred_bytes = int(total_bytes * (progress / 100))
+                
+                # Berechne ETA basierend auf aktueller Geschwindigkeit
+                if speed > 0:
+                    remaining_bytes = total_bytes - transferred_bytes
+                    eta_seconds = remaining_bytes / speed
+                    eta = timedelta(seconds=int(eta_seconds))
+                else:
+                    eta = timedelta.max
+            else:
+                total_bytes = 0
+                transferred_bytes = 0
+                eta = timedelta.max
+            
+            # Aktualisiere UI
+            self.main_window.progress_widget.update_transfer(
+                transfer_id=transfer_id,
+                filename=filename,
+                drive=drive_name,
+                progress=progress / 100,  # Konvertiere zu 0-1
+                speed=speed,
+                total_bytes=total_bytes,
+                transferred_bytes=transferred_bytes,
+                start_time=time.time(),
+                eta=eta
+            )
+            
+        except Exception as e:
+            logger.error(f"Fehler beim Aktualisieren des Transfers: {str(e)}", exc_info=True)
 
     def get_file_types(self):
         """Gibt eine Liste der verfügbaren Dateitypen zurück."""

@@ -5,7 +5,7 @@ import logging
 from PyQt5.QtWidgets import QListWidget, QListWidgetItem, QSizePolicy
 from PyQt5.QtCore import Qt
 from .drive_list_item import DriveListItem
-from ..style_helper import StyleHelper
+from ui.style_helper import StyleHelper
 
 logger = logging.getLogger(__name__)
 
@@ -30,22 +30,54 @@ class DriveList(QListWidget):
         
         # Widget soll sich in beide Richtungen ausdehnen
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        
+    
+    def _get_drive_type_order(self, drive_type: str) -> int:
+        """Gibt die Sortierreihenfolge für einen Laufwerkstyp zurück."""
+        order = {
+            'local': 0,
+            'removable': 1,
+            'remote': 2
+        }
+        return order.get(drive_type, 999)  # Unbekannte Typen ans Ende
+    
     def addItem(self, item):
-        """Fügt ein Laufwerk zur Liste hinzu."""
+        """Fügt ein Laufwerk zur Liste hinzu und sortiert es nach Typ."""
         if isinstance(item, DriveListItem):
+            # Finde die richtige Position basierend auf dem Laufwerkstyp
+            drive_type = item.drive_type
+            type_order = self._get_drive_type_order(drive_type)
+            
+            # Durchlaufe die Liste und finde die richtige Position
+            for i in range(self.count()):
+                current_item = self.item(i)
+                if isinstance(current_item, DriveListItem):
+                    current_type = current_item.drive_type
+                    current_order = self._get_drive_type_order(current_type)
+                    
+                    # Wenn wir eine Position mit höherer Ordnung finden,
+                    # fügen wir das neue Item davor ein
+                    if current_order > type_order:
+                        super().insertItem(i, item)
+                        item.setSizeHint(item.widget.sizeHint())
+                        self.setItemWidget(item, item.widget)
+                        self.drive_items[item.drive_letter] = item
+                        return
+            
+            # Wenn keine passende Position gefunden wurde, ans Ende anfügen
             super().addItem(item)
             item.setSizeHint(item.widget.sizeHint())
             self.setItemWidget(item, item.widget)
             self.drive_items[item.drive_letter] = item
+        else:
+            super().addItem(item)
             
     def remove_drive(self, drive_letter: str):
         """Entfernt ein Laufwerk aus der Liste."""
         if drive_letter in self.drive_items:
-            item = self.drive_items.pop(drive_letter)
+            item = self.drive_items[drive_letter]
             row = self.row(item)
-            if row >= 0:
-                self.takeItem(row)
+            self.takeItem(row)
+            del self.drive_items[drive_letter]
                 
     def get_selected_drives(self) -> list:
         """Gibt eine Liste der ausgewählten Laufwerksbuchstaben zurück."""

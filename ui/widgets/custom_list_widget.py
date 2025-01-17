@@ -3,6 +3,7 @@ Angepasstes ListWidget mit einheitlichem Styling.
 """
 from PyQt5.QtWidgets import QListWidget
 from PyQt5.QtCore import Qt
+from ui.style_helper import StyleHelper
 
 class CustomListWidget(QListWidget):
     """Ein angepasstes ListWidget mit einheitlichem Styling."""
@@ -13,52 +14,43 @@ class CustomListWidget(QListWidget):
         
     def setup_style(self):
         """Wendet das einheitliche Styling an."""
-        self.setStyleSheet("""
-            QListWidget {
-                background-color: #323232;
-                border: 1px solid #444444;
+        self.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {StyleHelper.SURFACE};
+                border: 1px solid {StyleHelper.BORDER};
                 border-radius: 4px;
                 padding: 4px;
-            }
-            
-            QListWidget::item {
-                color: white;
-                padding: 8px;
-                margin: 2px 0;
-                border-radius: 2px;
-            }
-            
-            QListWidget::item:selected {
-                background-color: #2d5ca6;
-            }
-            
-            QListWidget::item:hover {
-                background-color: #404040;
-            }
-            
-            QScrollBar:vertical {
-                border: none;
-                background: #404040;
-                width: 10px;
-                margin: 0;
-            }
-            
-            QScrollBar::handle:vertical {
-                background: #666666;
+            }}
+            QListWidget::item {{
+                background-color: transparent;
+                padding: 4px;
+                margin: 2px 0px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {StyleHelper.SURFACE_LIGHT};
+                color: {StyleHelper.TEXT};
+            }}
+            QListWidget::item:hover {{
+                background-color: {StyleHelper.SURFACE_LIGHT};
+            }}
+            QScrollBar:vertical {{
+                background-color: {StyleHelper.BACKGROUND};
+                width: 8px;
+                margin: 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background-color: {StyleHelper.ACCENT};
                 min-height: 20px;
-                border-radius: 5px;
-            }
-            
+                border-radius: 4px;
+            }}
             QScrollBar::add-line:vertical,
-            QScrollBar::sub-line:vertical {
-                height: 0;
-                background: none;
-            }
-            
+            QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
             QScrollBar::add-page:vertical,
-            QScrollBar::sub-page:vertical {
+            QScrollBar::sub-page:vertical {{
                 background: none;
-            }
+            }}
         """)
         
         # Weitere Einstellungen

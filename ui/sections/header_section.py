@@ -1,7 +1,9 @@
 from PyQt5.QtWidgets import (
-    QWidget, QHBoxLayout, QLabel, QComboBox
+    QWidget, QHBoxLayout, QLabel, QComboBox, QVBoxLayout
 )
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
+from ui.style_helper import StyleHelper
 
 class HeaderSection(QWidget):
     """Header-Sektion des Hauptfensters."""
@@ -9,69 +11,53 @@ class HeaderSection(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
+        
+    def resizeEvent(self, event):
+        """Wird aufgerufen, wenn sich die Größe des Widgets ändert."""
+        super().resizeEvent(event)
+        
+        # Aktualisiere die Header-Höhe basierend auf dem Banner-Ratio
+        if hasattr(self, 'banner_pixmap'):
+            banner_ratio = self.banner_pixmap.height() / self.banner_pixmap.width()
+            self.setFixedHeight(int(self.width() * banner_ratio))
+        
+        self.update_banner()
+        # Button-Container-Breite aktualisieren
+        if hasattr(self, 'button_container'):
+            self.button_container.resize(self.width(), 40)
+            
+    def update_banner(self):
+        """Aktualisiert die Größe des Banners."""
+        if hasattr(self, 'banner_pixmap') and hasattr(self, 'banner_label'):
+            scaled_pixmap = self.banner_pixmap.scaled(
+                self.width(), 
+                self.height(),
+                Qt.IgnoreAspectRatio, 
+                Qt.SmoothTransformation
+            )
+            self.banner_label.setPixmap(scaled_pixmap)
+            # Zentriere das Banner
+            self.banner_label.setAlignment(Qt.AlignCenter)
     
     def setup_ui(self):
         """Richtet das UI der Header-Sektion ein."""
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        # Hauptlayout
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, -10)  # Negativer unterer Margin um den Abstand zu reduzieren
+        main_layout.setSpacing(0)
         
-        # Logo (falls vorhanden)
-        logo_label = QLabel()
-        if hasattr(self, 'logo_pixmap'):
-            logo_label.setPixmap(self.logo_pixmap)
-        layout.addWidget(logo_label)
+        # Banner
+        self.banner_label = QLabel(self)
+        self.banner_pixmap = QPixmap("C:/Users/Shadow-PC/CascadeProjects/Ingest-Tool/docs/assets/banner_groß.png")
         
-        # Titel
-        title_label = QLabel("IngestTool")
-        title_label.setStyleSheet("""
-            QLabel {
-                color: white;
-                font-size: 18pt;
-                font-weight: bold;
-            }
-        """)
-        layout.addWidget(title_label)
+        # Berechne die Höhe basierend auf dem Banner-Ratio
+        banner_ratio = self.banner_pixmap.height() / self.banner_pixmap.width()
+        self.setFixedHeight(int(self.width() * banner_ratio))
         
-        layout.addStretch()
+        self.banner_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.banner_label)
         
-        # Sprach-Auswahl
-        language_widget = QWidget()
-        language_layout = QHBoxLayout(language_widget)
-        language_layout.setContentsMargins(0, 0, 0, 0)
         
-        language_label = QLabel("Sprache")
-        language_label.setStyleSheet("color: white; font-size: 10pt;")
         
-        self.language_combo = QComboBox()
-        self.language_combo.addItems(["Deutsch", "English"])
-        self.language_combo.setFixedWidth(120)
-        self.language_combo.setStyleSheet("""
-            QComboBox {
-                background-color: #3d3d3d;
-                color: white;
-                border: 1px solid gray;
-                border-radius: 3px;
-                padding: 5px;
-                font-size: 10pt;
-            }
-            QComboBox::drop-down {
-                border: none;
-                width: 20px;
-            }
-            QComboBox::down-arrow {
-                image: url(down_arrow.png);
-                width: 12px;
-                height: 12px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #3d3d3d;
-                color: white;
-                selection-background-color: rgb(13, 71, 161);
-                selection-color: white;
-            }
-        """)
-        
-        language_layout.addWidget(language_label)
-        language_layout.addWidget(self.language_combo)
-        
-        layout.addWidget(language_widget)
+        # Initialer Banner-Update
+        self.update_banner()

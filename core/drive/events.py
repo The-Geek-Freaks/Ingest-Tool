@@ -1,19 +1,45 @@
 """
-Event-Definitionen für Laufwerke und Dateien.
+Event-Definitionen für die Laufwerksüberwachung.
 """
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Optional
+from datetime import datetime
+from .status import DriveStatus
 
 @dataclass
 class DriveEvent:
     """Event für Laufwerksänderungen."""
-    drive: Dict
-    connected: bool
-    status: Optional[str] = None
+    
+    # Pfad zum Laufwerk
+    drive_path: str
+    
+    # Alter Status
+    old_status: Optional[DriveStatus]
+    
+    # Neuer Status
+    new_status: DriveStatus
+    
+    # Zeitstempel des Events
+    timestamp: datetime = datetime.now()
+    
+    # Optionale Fehlermeldung
+    error_message: Optional[str] = None
 
 @dataclass
 class FileEvent:
     """Event für Dateiänderungen."""
-    path: str
-    event_type: str  # 'new', 'modified', 'deleted'
-    info: Optional[Dict] = None
+    
+    # Pfad zur Datei
+    file_path: str
+    
+    # Art des Events (new, modified, deleted)
+    event_type: str
+    
+    # Dateigröße in Bytes
+    file_size: int
+    
+    # Zeitstempel des Events
+    timestamp: datetime = datetime.now()
+    
+    # Optionale Metadaten
+    metadata: Optional[dict] = None

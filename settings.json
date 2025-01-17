@@ -1,24 +1,24 @@
 {
     "mappings": {
-        "*.mp4": "U:/ARCHIV"
+        ".mp4": "U:/ARCHIV"
     },
     "excluded_drives": [
-        "L",
         "V",
+        "Y",
+        "K",
+        "T",
+        "P",
         "E",
-        "Q",
+        "W",
         "C",
-        "G",
+        "X",
         "U",
         "N",
-        "T",
-        "X",
-        "R",
-        "P",
-        "W",
         "D",
-        "Y",
+        "Q",
         "Z",
-        "K"
+        "L",
+        "G",
+        "R"
     ]
 }

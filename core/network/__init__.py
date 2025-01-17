@@ -2,8 +2,6 @@
 Netzwerkoperationen und -verwaltung.
 """
 
-from .manager import NetworkManager
-from .copy_manager import NetworkCopyManager
 from .errors import (
     NetworkError,
     ConnectionError,
@@ -19,8 +17,6 @@ from .types import (
 )
 
 __all__ = [
-    'NetworkManager',
-    'NetworkCopyManager',
     'NetworkError',
     'ConnectionError',
     'TransferError',

@@ -75,8 +75,45 @@ class DropZone(QLabel):
             if not files:
                 return
                 
-            # Übergebe die Dateien an die bestehende Funktion
-            self.main_window.start_copy_for_files(files)
+            # Übergebe die Dateien an den Transfer Coordinator
+            for file_path in files:
+                # Bestimme den Dateityp
+                _, ext = os.path.splitext(file_path)
+                ext = ext.lower()
+                
+                # Suche passende Zuordnung
+                target_path = self.main_window.get_mapping_for_type(ext)
+                if target_path:
+                    logger.info(f"Gefundene Zuordnung für {ext}: {target_path}")
+                    
+                    # Starte Transfer mit OptimizedCopyEngine
+                    try:
+                        target_file = os.path.join(target_path, os.path.basename(file_path))
+                        logger.info(f"Starte Transfer: {file_path} -> {target_file}")
+                        
+                        # Verwende den TransferCoordinator für den Kopiervorgang
+                        self.main_window.transfer_coordinator.start_copy(
+                            source_drive=os.path.dirname(file_path),
+                            target_path=target_path,
+                            file_types=[os.path.splitext(file_path)[1][1:]]  # Dateityp ohne Punkt
+                        )
+                        
+                    except Exception as e:
+                        logger.error(f"Fehler beim Transfer von {file_path}: {str(e)}")
+                        QMessageBox.critical(
+                            self,
+                            "Fehler",
+                            f"Fehler beim Transfer von {file_path}:\n{str(e)}",
+                            QMessageBox.Ok
+                        )
+                else:
+                    logger.warning(f"Keine Zuordnung gefunden für {ext}")
+                    QMessageBox.warning(
+                        self,
+                        "Keine Zuordnung",
+                        f"Keine Zuordnung gefunden für Dateityp {ext}",
+                        QMessageBox.Ok
+                    )
             
             # Setze die UI zurück
             self._setup_ui()

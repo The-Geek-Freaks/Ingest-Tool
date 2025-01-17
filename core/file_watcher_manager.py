@@ -5,16 +5,19 @@
 Verwaltet die Dateiüberwachung für verschiedene Laufwerke.
 """
 
-import os
 import logging
+import os
 import threading
-import re
-from typing import Dict, List, Callable
-from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot, QMetaObject, Qt, Q_ARG, QMetaType, QTimer
+from typing import Dict, List, Optional, Set, Callable, Any, Tuple
+from PyQt5.QtCore import (
+    QObject, pyqtSignal, pyqtSlot, Qt, QMutex,
+    QMutexLocker, QTimer
+)
 from PyQt5.QtGui import QTextCursor
 from utils.file_watcher import FileWatcher as BaseFileWatcher
-from core.file_transfer_manager import FileTransferManager
+from core.transfer.transfer_coordinator import TransferCoordinator
 import sys
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -48,34 +51,53 @@ class FileWatcherManager(QObject):
     
     file_found = pyqtSignal(str)  # Signal wenn eine Datei gefunden wurde
     
-    def __init__(self, main_window=None):
+    def __init__(self, main_window):
         """Initialisiert den FileWatcherManager.
         
         Args:
             main_window: Hauptfenster der Anwendung
         """
         super().__init__()
+        
+        # Logging
         self.logger = logging.getLogger(__name__)
-        self.watchers = {}
-        self.file_types = []
-        self.excluded_drives = []
-        self._is_watching = False
+        self.logger.info("FileWatcherManager initialisiert")
+        
+        # Referenz auf Hauptfenster
         self.main_window = main_window
-        self.file_mappings = {}
         
-        # Initialisiere Transfer Manager
-        self.transfer_manager = FileTransferManager()
-        self.transfer_manager.transfer_started.connect(self._on_transfer_started)
-        self.transfer_manager.transfer_progress.connect(self._on_transfer_progress)
-        self.transfer_manager.transfer_completed.connect(self._on_transfer_completed)
-        self.transfer_manager.transfer_error.connect(self._on_transfer_error)
+        # Hole TransferCoordinator vom Hauptfenster
+        if not hasattr(main_window, 'transfer_coordinator'):
+            self.logger.error("MainWindow hat keinen TransferCoordinator")
+            raise AttributeError("MainWindow muss einen TransferCoordinator haben")
+        self.transfer_coordinator = main_window.transfer_coordinator
         
-        # Initialisiere Zuordnungen
-        if self.main_window:
-            self.update_file_mappings()
-            
-        self.logger.debug("FileWatcherManager initialisiert")
+        # Verbinde Signale
+        self.transfer_coordinator.transfer_started.connect(
+            self._on_transfer_started,
+            type=Qt.QueuedConnection
+        )
+        self.transfer_coordinator.transfer_completed.connect(
+            self._on_transfer_completed,
+            type=Qt.QueuedConnection
+        )
+        self.transfer_coordinator.transfer_error.connect(
+            self._on_transfer_error,
+            type=Qt.QueuedConnection
+        )
         
+        # Initialisiere Watcher
+        self._watchers: Dict[str, SignalFileWatcher] = {}  # Pfad -> FileWatcher
+        self._mappings: Dict[str, str] = {}  # Dateityp -> Zielverzeichnis
+        self._excluded_drives: Set[str] = set()  # Ausgeschlossene Laufwerke
+        
+        # Threading
+        self._mutex = QMutex()
+        self._is_watching = False
+        self._processed_files: Dict[str, float] = {}
+        self._processed_files_lock = threading.Lock()
+        self._transfer_in_progress = False
+
     @property
     def is_watching(self) -> bool:
         """Gibt zurück ob die Überwachung aktiv ist."""
@@ -114,12 +136,12 @@ class FileWatcherManager(QObject):
     def set_excluded_drives(self, drives: List[str]):
         """Setzt die Liste der ausgeschlossenen Laufwerke."""
         try:
-            self.excluded_drives = [d.upper() for d in drives if d]
-            self.logger.info(f"Ausgeschlossene Laufwerke aktualisiert: {self.excluded_drives}")
+            self._excluded_drives = set(drives)
+            self.logger.info(f"Ausgeschlossene Laufwerke aktualisiert: {self._excluded_drives}")
             
             # Stoppe Watcher für ausgeschlossene Laufwerke
-            for drive in list(self.watchers.keys()):
-                if drive in self.excluded_drives:
+            for drive in list(self._watchers.keys()):
+                if drive in self._excluded_drives:
                     self.stop_watcher(drive)
                     
         except Exception as e:
@@ -158,14 +180,14 @@ class FileWatcherManager(QObject):
     def start_watching_drive(self, drive_letter: str):
         """Startet die Überwachung für ein bestimmtes Laufwerk."""
         try:
-            if not drive_letter or drive_letter in self.watchers:
+            if not drive_letter or drive_letter in self._watchers:
                 return
                 
             # Erstelle Pfad
             drive_path = f"{drive_letter}:\\"
             
             # Hole aktuelle Dateitypen aus den Zuordnungen
-            file_types = list(self.file_mappings.keys())
+            file_types = list(self._mappings.keys())
             if not file_types:
                 self.logger.warning(f"Keine Dateitypen konfiguriert für {drive_path}")
                 return
@@ -174,13 +196,13 @@ class FileWatcherManager(QObject):
             watcher = SignalFileWatcher(drive_path, file_types)
             
             # Verbinde Signal direkt mit unserem Handler
-            watcher.file_found.connect(self._on_file_found)
+            watcher.file_found.connect(self._handle_new_file)
             
             # Starte Überwachung
             watcher.start()
             
             # Speichere Watcher
-            self.watchers[drive_letter] = watcher
+            self._watchers[drive_letter] = watcher
             self.logger.info(f"Überwachung von {drive_path} gestartet")
             
         except Exception as e:
@@ -189,10 +211,10 @@ class FileWatcherManager(QObject):
     def stop_watcher(self, drive_letter: str):
         """Stoppt den Watcher für das angegebene Laufwerk."""
         try:
-            if drive_letter in self.watchers:
-                watcher = self.watchers[drive_letter]
+            if drive_letter in self._watchers:
+                watcher = self._watchers[drive_letter]
                 watcher.stop()
-                del self.watchers[drive_letter]
+                del self._watchers[drive_letter]
                 self.logger.info(f"Watcher für Laufwerk {drive_letter} gestoppt")
                 
         except Exception as e:
@@ -207,7 +229,7 @@ class FileWatcherManager(QObject):
             self.logger.info("Stoppe Datenträgerüberwachung")
             
             # Stoppe alle Watcher
-            for drive, watcher in self.watchers.items():
+            for drive, watcher in self._watchers.items():
                 try:
                     watcher.stop()
                     self.logger.info(f"Überwachung von {drive}:\\ gestoppt")
@@ -215,11 +237,17 @@ class FileWatcherManager(QObject):
                     self.logger.error(f"Fehler beim Stoppen des Watchers für {drive}: {e}")
             
             # Stoppe auch den Transfer Manager
-            if hasattr(self, 'transfer_manager'):
-                self.transfer_manager.abort_transfers()
+            if hasattr(self, 'transfer_coordinator'):
+                self.transfer_coordinator.abort_transfers()
             
-            self.watchers.clear()
+            self._watchers.clear()
             self._is_watching = False
+            
+            # Lösche verarbeitete Dateien und setze Transfer-Status zurück
+            with self._processed_files_lock:
+                self._processed_files.clear()
+                self._transfer_in_progress = False
+            
             self.logger.info("Datenträgerüberwachung gestoppt")
             
         except Exception as e:
@@ -228,7 +256,7 @@ class FileWatcherManager(QObject):
     def update_file_mappings(self):
         """Aktualisiert die Zuordnungen zwischen Dateitypen und Zielverzeichnissen."""
         try:
-            self.file_mappings.clear()
+            self._mappings.clear()
             if not self.main_window:
                 return
                 
@@ -251,176 +279,72 @@ class FileWatcherManager(QObject):
                         target_path = os.path.abspath(target)
                         
                         # Füge die Zuordnung hinzu
-                        self.file_mappings[clean_type.lower()] = target_path
+                        self._mappings[clean_type.lower()] = target_path
                         self.logger.info(f"Zuordnung hinzugefügt: {clean_type} -> {target_path}")
                         
-            self.logger.debug(f"Aktualisierte Zuordnungen: {self.file_mappings}")
+            self.logger.debug(f"Aktualisierte Zuordnungen: {self._mappings}")
             
         except Exception as e:
             self.logger.error(f"Fehler beim Aktualisieren der Zuordnungen: {str(e)}", exc_info=True)
 
-    def _on_file_found(self, file_path: str):
-        """Callback für gefundene Dateien."""
+    def _handle_new_file(self, file_path: str):
+        """Verarbeitet eine neue Datei."""
         try:
-            self.logger.info(f"Neue Datei gefunden: {file_path}")
-            
-            # Hole Dateierweiterung (case-insensitive)
-            file_ext = os.path.splitext(file_path)[1].lower()
-            if not file_ext:
-                self.logger.warning(f"Keine Dateierweiterung gefunden für: {file_path}")
-                return
-                
-            # Debug-Ausgaben
-            self.logger.debug(f"Verarbeite: {file_path}")
-            self.logger.debug(f"Dateityp: {file_ext}")
-            self.logger.debug(f"Verfügbare Zuordnungen: {self.file_mappings}")
-            
-            # Aktualisiere Zuordnungen
-            self.update_file_mappings()
-            
-            # Prüfe Zuordnung
-            target_dir = self.file_mappings.get(file_ext)
-            
-            if target_dir:
-                self.logger.info(f"Zuordnung gefunden für {file_ext} -> {target_dir}")
-                
-                # Stelle sicher, dass das Zielverzeichnis existiert
-                try:
-                    os.makedirs(target_dir, exist_ok=True)
-                    self.logger.info(f"Zielverzeichnis bereit: {target_dir}")
-                except Exception as e:
-                    self.logger.error(f"Fehler beim Erstellen des Zielverzeichnisses: {str(e)}")
+            # Prüfe ob die Datei bereits verarbeitet wird oder ein Transfer läuft
+            with self._processed_files_lock:
+                if file_path in self._processed_files or self._transfer_in_progress:
                     return
                 
-                # Bestimme Zieldatei
+                # Prüfe Dateiendung
+                _, ext = os.path.splitext(file_path)
+                ext = ext.lower()
+                
+                # Finde passendes Zielverzeichnis
+                if ext not in self._mappings:
+                    self.logger.debug(f"Keine Zuordnung für Dateiendung {ext}")
+                    return
+                    
+                target_dir = self._mappings[ext]
+                if not target_dir:
+                    self.logger.warning(f"Kein Zielverzeichnis für {ext}")
+                    return
+                    
+                # Erstelle Zielverzeichnis wenn nicht vorhanden
+                if not os.path.exists(target_dir):
+                    try:
+                        os.makedirs(target_dir)
+                    except Exception as e:
+                        self.logger.error(f"Fehler beim Erstellen des Zielverzeichnisses: {e}")
+                        return
+                
+                # Berechne Zielpfad (direkt im Zielverzeichnis, ohne Unterordner)
                 filename = os.path.basename(file_path)
                 target_path = os.path.join(target_dir, filename)
                 
-                # Führe Transfer durch
-                try:
-                    self.logger.info(f"Starte Transfer: {file_path} -> {target_dir}")
-                    success = self.transfer_manager.transfer_file(file_path, target_path)
-                    
-                    if success:
-                        self.logger.info(f"Transfer erfolgreich: {filename}")
-                        # Aktualisiere UI im Hauptthread
-                        if self.main_window:
-                            # Verwende QMetaObject.invokeMethod für thread-sichere UI-Aktualisierung
-                            message = f"Datei gefunden und Transfer gestartet: {filename}"
-                            QMetaObject.invokeMethod(self.main_window, 
-                                                   "log_message",
-                                                   Qt.QueuedConnection,
-                                                   Q_ARG(str, message))
-                    else:
-                        self.logger.error(f"Transfer fehlgeschlagen: {filename}")
-                        
-                except Exception as e:
-                    self.logger.error(f"Fehler beim Transfer: {str(e)}")
-            else:
-                self.logger.debug(f"Keine Zuordnung gefunden für {file_ext}")
+                # Starte Transfer
+                self.logger.info(f"Starte Transfer: {file_path} -> {target_path}")
+                self.transfer_coordinator.start_transfer(file_path, target_path)
+                
+                # Markiere Datei als verarbeitet
+                self._processed_files[file_path] = time.time()
                 
         except Exception as e:
-            self.logger.error(f"Fehler beim Verarbeiten der gefundenen Datei: {str(e)}", exc_info=True)
+            self.logger.error(f"Fehler bei der Verarbeitung von {file_path}: {str(e)}", exc_info=True)
 
-    def _handle_file_found(self, file_path: str):
-        """Verarbeitet gefundene Dateien im Hauptthread."""
-        try:
-            self.logger.info(f"Neue Datei gefunden: {file_path}")
-            
-            # Hole Dateierweiterung (case-insensitive)
-            file_ext = os.path.splitext(file_path)[1].lower()
-            if not file_ext:
-                self.logger.warning(f"Keine Dateierweiterung gefunden für: {file_path}")
-                return
-                
-            # Debug-Ausgaben
-            self.logger.debug(f"Verarbeite: {file_path}")
-            self.logger.debug(f"Dateityp: {file_ext}")
-            self.logger.debug(f"Verfügbare Zuordnungen: {self.file_mappings}")
-            
-            # Aktualisiere Zuordnungen
-            self.update_file_mappings()
-            
-            # Prüfe Zuordnung
-            target_dir = self.file_mappings.get(file_ext)
-            
-            if target_dir:
-                self.logger.info(f"Zuordnung gefunden für {file_ext} -> {target_dir}")
-                
-                # Stelle sicher, dass das Zielverzeichnis existiert
-                try:
-                    os.makedirs(target_dir, exist_ok=True)
-                    self.logger.info(f"Zielverzeichnis bereit: {target_dir}")
-                except Exception as e:
-                    self.logger.error(f"Fehler beim Erstellen des Zielverzeichnisses: {str(e)}")
-                    return
-                
-                # Führe Transfer durch
-                try:
-                    self.logger.info(f"Starte Transfer: {file_path} -> {target_dir}")
-                    success = self.transfer_manager.transfer_file(file_path, target_dir)
-                    
-                    if success:
-                        self.logger.info(f"Transfer erfolgreich: {os.path.basename(file_path)}")
-                        # Aktualisiere UI im Hauptthread
-                        if self.main_window:
-                            # Verwende QTimer.singleShot für thread-sichere UI-Aktualisierung
-                            QTimer.singleShot(0, lambda: self.main_window.log_message(
-                                f"Datei kopiert: {os.path.basename(file_path)}"))
-                    else:
-                        self.logger.error(f"Transfer fehlgeschlagen: {file_path}")
-                except Exception as e:
-                    self.logger.error(f"Fehler beim Transfer: {str(e)}", exc_info=True)
-            else:
-                self.logger.warning(f"Keine Zuordnung für Dateityp gefunden: {file_ext}")
-                
-        except Exception as e:
-            self.logger.error(f"Fehler in _handle_file_found: {str(e)}", exc_info=True)
-
-    def _on_transfer_progress(self, filename: str, progress: float, speed: float):
-        """Handler für Transfer-Fortschritt."""
-        try:
-            if self.main_window:
-                # Hole Laufwerksbuchstaben
-                drive_letter = os.path.splitdrive(filename)[0].rstrip(':')
-                if drive_letter:
-                    # Hole Dateigröße
-                    total_size = os.path.getsize(filename)
-                    transferred = int(total_size * (progress / 100))
-                    
-                    # Aktualisiere UI
-                    self.main_window.on_progress_updated(
-                        drive_letter,  # Laufwerk
-                        os.path.basename(filename),  # Dateiname
-                        progress,  # Fortschritt in Prozent
-                        speed,  # Geschwindigkeit in MB/s
-                        total_size,  # Gesamtgröße
-                        transferred  # Übertragene Bytes
-                    )
-                    
-        except Exception as e:
-            self.logger.error(f"Fehler beim Aktualisieren des Fortschritts: {e}")
-
-    def _on_transfer_started(self, filename: str):
+    @pyqtSlot(str, str)
+    def _on_transfer_started(self, transfer_id: str, filename: str):
         """Handler für gestartete Transfers."""
-        self.logger.info(f"Transfer gestartet: {filename}")
-        if self.main_window:
-            QTimer.singleShot(0, lambda: self.main_window.log_message(
-                f"Starte Transfer: {filename}"))
-                
-    def _on_transfer_completed(self, filename: str):
+        self.logger.debug(f"Transfer gestartet: {transfer_id} - {filename}")
+        
+    @pyqtSlot(str)
+    def _on_transfer_completed(self, transfer_id: str):
         """Handler für abgeschlossene Transfers."""
-        self.logger.info(f"Transfer abgeschlossen: {filename}")
-        if self.main_window:
-            QTimer.singleShot(0, lambda: self.main_window.log_message(
-                f"Transfer abgeschlossen: {filename}"))
-                
-    def _on_transfer_error(self, filename: str, error: str):
+        self.logger.debug(f"Transfer abgeschlossen: {transfer_id}")
+        
+    @pyqtSlot(str, str)
+    def _on_transfer_error(self, transfer_id: str, error: str):
         """Handler für Transfer-Fehler."""
-        self.logger.error(f"Transfer-Fehler für {filename}: {error}")
-        if self.main_window:
-            QTimer.singleShot(0, lambda: self.main_window.log_message(
-                f"Fehler beim Transfer von {filename}: {error}"))
+        self.logger.debug(f"Transfer-Fehler: {transfer_id} - {error}")
 
     def start_watcher(self, drive_path: str, file_types: list) -> bool:
         """Startet einen neuen Watcher für ein Laufwerk.
@@ -436,19 +360,19 @@ class FileWatcherManager(QObject):
             drive_letter = os.path.splitdrive(drive_path)[0].rstrip(':')
             
             # Stoppe existierenden Watcher falls vorhanden
-            if drive_letter in self.watchers:
+            if drive_letter in self._watchers:
                 self.stop_watcher(drive_letter)
             
             # Erstelle und starte neuen Watcher
             watcher = SignalFileWatcher(drive_path, file_types)
             
             # Verbinde Signal mit unserem Handler
-            watcher.file_found.connect(self._on_file_found)
+            watcher.file_found.connect(self._handle_new_file)
             
             watcher.start()
             
             # Speichere Watcher
-            self.watchers[drive_letter] = watcher
+            self._watchers[drive_letter] = watcher
             self.logger.info(f"Watcher für Laufwerk {drive_letter} gestartet")
             
             return True
@@ -463,8 +387,8 @@ class FileWatcherManager(QObject):
             self.logger.info("Breche alle Transfers ab")
             
             # Stoppe den Transfer Manager
-            if hasattr(self, 'transfer_manager'):
-                self.transfer_manager.abort_transfers()
+            if hasattr(self, 'transfer_coordinator'):
+                self.transfer_coordinator.abort_transfers()
             
             # Stoppe die Überwachung
             self.stop()

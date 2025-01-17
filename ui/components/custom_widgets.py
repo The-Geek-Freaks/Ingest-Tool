@@ -5,6 +5,8 @@ Benutzerdefinierte UI-Widgets.
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QPen
 from PyQt5.QtWidgets import QPushButton, QListWidget, QListWidgetItem
+from ui.style_helper import StyleHelper
+from ui.theme_manager import ThemeManager
 
 class CustomButton(QPushButton):
     """Angepasster Button mit Hover-Effekt und Tooltip."""
@@ -80,30 +82,15 @@ class CustomListWidget(QListWidget):
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
         self.setSelectionMode(QListWidget.ExtendedSelection)
-        self.setStyleSheet("""
-            QListWidget {
-                background-color: #3d3d3d;
-                color: white;
-                border: 1px solid gray;
-                border-radius: 3px;
-                padding: 5px;
-            }
-            QListWidget::item {
-                background-color: #2d2d2d;
-                border: 1px solid #555;
-                border-radius: 2px;
-                margin: 2px;
-                padding: 5px;
-            }
-            QListWidget::item:selected {
-                background-color: rgb(13, 71, 161);
-                border: 1px solid rgb(25, 118, 210);
-            }
-            QListWidget::item:hover {
-                background-color: #4d4d4d;
-                border: 1px solid #666;
-            }
-        """)
+        self.update_style()
+        
+        # Theme-Änderungen überwachen
+        self.theme_manager = ThemeManager()
+        self.theme_manager.theme_changed.connect(self.update_style)
+    
+    def update_style(self):
+        """Aktualisiert den Style basierend auf dem aktuellen Theme."""
+        self.setStyleSheet(StyleHelper.get_list_widget_style())
         
     def dragEnterEvent(self, event):
         """Handler für Drag Enter Events."""

@@ -1,4 +1,13 @@
-PyQt5>=5.15.9
+PyQt6>=6.5.0
 wmi>=1.5.1
-psutil>=5.9.7
+psutil>=5.9.0
 typing>=3.7.4.3
+pywin32>=306
+pillow>=10.0.0
+pathlib>=1.0.1
+pytest>=7.4.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+cryptography>=41.0.0
+black>=23.7.0
+mypy>=1.5.0

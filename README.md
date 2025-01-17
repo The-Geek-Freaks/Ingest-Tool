@@ -14,7 +14,7 @@
   [![GitHub stars](https://img.shields.io/github/stars/The-Geek-Freaks/Ingest-Tool)](https://github.com/The-Geek-Freaks/Ingest-Tool/stargazers)
   ![Contributors](https://img.shields.io/github/contributors/The-Geek-Freaks/Ingest-Tool)
   ![Downloads](https://img.shields.io/github/downloads/The-Geek-Freaks/Ingest-Tool/total)
-  [![Discord](https://img.shields.io/discord/XXXXX?label=Discord&logo=discord)](https://tgf.click/discord)
+  [![Discord](https://img.shields.io/discord/397127284114325504?label=Discord&logo=discord)](https://tgf.click/discord)
 </div>
 
 ## 📑 Inhaltsverzeichnis
@@ -162,6 +162,17 @@
 
 ## ⚡ Performance
 
+### Optimierte Dateiübertragung
+- Parallele Verarbeitung für große Dateimengen
+- Intelligentes Chunk-Management
+- Fortgeschrittene Fehlerbehandlung
+- Automatische Wiederaufnahme bei Unterbrechungen
+
+### Ressourcennutzung
+- Dynamische Speicherverwaltung
+- Effiziente CPU-Nutzung
+- Optimierte I/O-Operationen
+
 | Operation | Geschwindigkeit |
 |-----------|----------------|
 | Kopieren (SSD → SSD) | ~500 MB/s |
@@ -175,19 +186,59 @@
 ⬇️ [Neueste Version herunterladen](https://github.com/The-Geek-Freaks/Ingest-Tool/releases/latest)
 
 ### Manuelle Installation
-```bash
+   ```bash
 # Repository klonen
-git clone https://github.com/The-Geek-Freaks/Ingest-Tool.git
+   git clone https://github.com/The-Geek-Freaks/Ingest-Tool.git
 
 # Ins Verzeichnis wechseln
-cd Ingest-Tool
+   cd Ingest-Tool
 
 # Abhängigkeiten installieren
-pip install -r requirements.txt
+   pip install -r requirements.txt
+   ```
+5. Anwendung starten:
+   ```bash
+   python ingest_tool.py
+   ```
 
-# Programm starten
-python main.py
+### Development Setup
+Für Entwickler empfehlen wir zusätzlich:
+```bash
+pip install -r requirements-dev.txt
 ```
+
+Dies installiert:
+- pytest für Unit Tests
+- black für Code-Formatierung
+- mypy für statische Typ-Überprüfung
+
+## 🛠️ Konfiguration
+
+### Umgebungsvariablen
+Erstellen Sie eine `.env` Datei im Root-Verzeichnis:
+```env
+DEBUG=False
+LOG_LEVEL=INFO
+THEME=dark
+```
+
+### Logging
+Logs werden standardmäßig in `./logs` gespeichert. Das Log-Level kann in der `.env` Datei konfiguriert werden.
+
+## 🔧 Fehlerbehebung
+
+### Bekannte Probleme
+- UI kann bei sehr großen Dateimengen (>100GB) verzögert reagieren
+- Netzwerkverbindungen können bei instabiler Verbindung neu aufgebaut werden müssen
+
+### Debugging
+1. Debug-Modus aktivieren in `.env`:
+   ```env
+   DEBUG=True
+   LOG_LEVEL=DEBUG
+   ```
+2. Log-Dateien prüfen unter `./logs`
+3. Bei Bedarf Issue auf GitHub erstellen
 
 ## 🗺️ Roadmap
 
@@ -197,31 +248,13 @@ python main.py
 - [x] Fortschrittsanzeige
 - [ ] Profi-Funktionen
   - [ ] Erweiterte Filteroptionen
-  - [ ] Backup-Strategien
-  - [ ] Automatisierte Workflows
+  - [x] Backup-Strategien
+  - [x] Automatisierte Workflows
 - [ ] Crossplattform
   - [ ] Linux Support
   - [ ] macOS Support
 - [ ] Rechtsklickintegration
 - [ ] API für Entwickler
-
-## 🔧 Entwicklungsstatus
-
-### In Arbeit
-- **Multi-Language Support**
-  - Implementierung der Übersetzungs-Engine
-  - Vorbereitung der Sprachdateien für EN/DE
-  - Automatische Spracherkennung
-
-- **Clean-Up Projekt**
-  - Optimierung der temporären Dateiverwaltung
-  - Automatische Bereinigung nach Abschluss
-  - Verbesserte Fehlerbehandlung
-
-- **Erweiterte Funktionen**
-  - Profi-Werkzeuge für Batch-Verarbeitung
-  - Erweiterte Filtermöglichkeiten
-  - Anpassbare Workflow-Automatisierung
 
 ## 👥 Community
 
@@ -235,9 +268,9 @@ python main.py
 ## 🔧 Fehlerbehebung
 
 ### Bekannte Probleme
-- **Laufwerkserkennung**: Stellen Sie sicher, dass die Laufwerke korrekt eingebunden sind
-- **Dateizuordnungen**: Überprüfen Sie die korrekte Syntax der Dateityp-Zuordnungen (*.ext oder .ext)
-- **Netzwerkpfade**: Bei Netzwerkpfaden auf korrekte Zugriffsrechte achten
+- **Submenü funktionslos**: Einige Submenüpunkte noch nicht implementiert
+- **Themewahl**: Themeauswahl noch nicht implementiert
+- **Sprachwahl**: Sprachwahl noch nicht funktionsfähig
 
 ### Support
 - **GitHub Issues**: [Bug-Reports und Feature-Requests](https://github.com/The-Geek-Freaks/Ingest-Tool/issues)

@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QTextEdit,
     QLabel
 )
+from ui.widgets.header_widget import HeaderWidget
 
 class LogSection(QWidget):
     """Sektion für die Log-Anzeige."""
@@ -19,10 +20,8 @@ class LogSection(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # Header
-        header = QLabel("Protokoll")
-        header.setStyleSheet("font-weight: bold; color: white;")
-        layout.addWidget(header)
+        # Header und Content in HeaderWidget
+        log_widget = HeaderWidget("📝 Protokoll")
         
         # Log Text
         self.log_text = QTextEdit()
@@ -33,10 +32,12 @@ class LogSection(QWidget):
                 color: white;
                 border: 1px solid #555;
                 border-radius: 3px;
+                padding: 5px;
             }
         """)
-        layout.addWidget(self.log_text)
+        log_widget.add_widget(self.log_text)
         
+        layout.addWidget(log_widget)
         self.setLayout(layout)
         
     def log(self, message: str):

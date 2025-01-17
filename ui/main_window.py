@@ -11,13 +11,14 @@ import logging
 from datetime import datetime
 from typing import Dict, Optional, List, Tuple
 import time
+from datetime import timedelta
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QListWidget, QLineEdit,
     QComboBox, QCheckBox, QMessageBox, QFileDialog,
     QGroupBox, QSpacerItem, QSizePolicy,
-    QDialog, QListWidgetItem, QShortcut
+    QDialog, QListWidgetItem, QShortcut, QSplitter
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QTimer, QMetaObject
 from PyQt5.QtGui import QIcon, QFont, QKeySequence
@@ -37,12 +38,11 @@ from utils.file_system_helper import FileSystemHelper
 
 from core.drive_controller import DriveController
 from core.transfer.transfer_coordinator import TransferCoordinator
-from core.transfer.manager import TransferManager, TransferPriority
-from ui.controllers.transfer_controller import TransferController
+from core.transfer.manager import Manager
+from core.transfer.priority import TransferPriority
 from core.scheduler import TransferScheduler
 from core.batch_manager import BatchManager
-from core.parallel_copier import ParallelCopier
-from core.file_watcher_manager import FileWatcherManager  # Korrigierter Import
+from core.file_watcher_manager import FileWatcherManager
 
 from ui.handlers.transfer_handlers import TransferHandlers
 from ui.handlers.settings_handlers import SettingsHandlers
@@ -52,9 +52,12 @@ from ui.handlers.event_handlers import EventHandlers
 from ui.handlers.drive_event_handlers import DriveEventHandlers
 from ui.handlers.transfer_event_handlers import TransferEventHandlers
 from ui.layouts.main_layout import MainLayout
-from ui.style_helper import StyleHelper
-from ui.widgets.progress_widget import ProgressWidget
-from ui.widgets.drop_zone import DropZone
+from ui.widgets import (
+    CustomButton, CustomListWidget, DriveWidget,
+    ModernTransferWidget
+)
+from ui.widgets.modern_transfer_widget import TransferStatus, TransferItemData
+from ui.theme_manager import ThemeManager
 
 # Logger konfigurieren
 logger = logging.getLogger(__name__)
@@ -107,16 +110,28 @@ class ShutdownThread(QThread):
 class MainWindow(QMainWindow):
     """Hauptfenster der Anwendung."""
     
-    def __init__(self, app=None):
+    def __init__(self, app):
+        """Initialisiert das Hauptfenster."""
         super().__init__()
         
-        # Initialisiere Logger
+        # Speichere die App-Referenz
+        self.app = app
+        
+        # Setze das Programm-Icon
+        self.setWindowIcon(QIcon("C:/Users/Shadow-PC/CascadeProjects/Ingest-Tool/ressourcen/icon.png"))
+        
+        # Initialisiere den Logger
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
         
+        # Theme Manager initialisieren
+        self.theme_manager = ThemeManager()
+        # Wende Theme auf die gesamte Anwendung an
+        self.app.setStyleSheet(self.theme_manager.get_stylesheet())
+        
         # Setze initiale Fenstergröße
-        self.resize(1440, 1230)
-        self.setMinimumSize(1200, 800)
+        self.resize(1440, 1000)  # Erhöht um 100 Pixel in der Höhe (von 900 auf 1000)
+        self.setMinimumSize(1200, 1000)
         
         # Flag für erstes Anzeigen
         self._first_show = True
@@ -126,6 +141,7 @@ class MainWindow(QMainWindow):
         self.is_watching = False
         self.excluded_drives = []  # Liste der ausgeschlossenen Laufwerke
         self.active_copies = {}  # Dictionary für aktive Kopiervorgänge
+        self.transfers = {}  # Dictionary für Transfer-Status
         
         # Initialisiere UI-Elemente
         self.drives_list = DriveList()
@@ -133,9 +149,15 @@ class MainWindow(QMainWindow):
         self.mappings_list = QListWidget()
         self.excluded_list = QListWidget()
         self.filetype_combo = QComboBox()
+        self.filetype_combo.setPlaceholderText("Bitte auswählen")
+        self.filetype_combo.setMaxVisibleItems(15)
+        self.filetype_combo.setMinimumWidth(150)
         StyleHelper.style_combobox(self.filetype_combo)
         self.target_path_edit = QLineEdit()
         self.browse_button = QPushButton("📂")
+        
+        # Progress Widget initialisieren
+        self.transfer_widget = ModernTransferWidget(self)
         
         # Start Button
         self.start_button = QPushButton("▶️ Start")
@@ -166,7 +188,7 @@ class MainWindow(QMainWindow):
                 border-radius: 3px;
             }
             QPushButton:hover {
-                background-color: #d32f2f;
+                background-color: #da190b;
             }
             QPushButton:disabled {
                 background-color: #cccccc;
@@ -202,6 +224,27 @@ class MainWindow(QMainWindow):
         self.exclude_all_button = QPushButton("⛔ Alle ausschließen")
         self.auto_start_checkbox = QCheckBox("🔄 Automatisch starten")
         
+        # Button Styles
+        button_style = f"""
+            QPushButton {{
+                background-color: {StyleHelper.SURFACE};
+                color: {StyleHelper.TEXT};
+                border: 1px solid {StyleHelper.BORDER};
+                border-radius: 3px;
+                padding: 5px;
+                min-width: 80px;
+            }}
+            QPushButton:hover {{
+                background-color: {StyleHelper.SURFACE_LIGHT};
+            }}
+        """
+        
+        self.add_mapping_button.setStyleSheet(button_style)
+        self.remove_mapping_button.setStyleSheet(button_style)
+        self.add_excluded_button.setStyleSheet(button_style)
+        self.remove_excluded_button.setStyleSheet(button_style)
+        self.exclude_all_button.setStyleSheet(button_style)
+        
         # Initialisiere Manager und Controller
         self.settings_manager = SettingsManager()
         self.settings = self.settings_manager.load_settings()
@@ -219,13 +262,78 @@ class MainWindow(QMainWindow):
         # Verbinde UI-Signale
         self.event_handlers.connect_signals()
         
-        # Initialisiere weitere Manager
+        # Initialisiere TransferCoordinator
+        self.transfer_settings = {
+            'max_workers': 4,
+            'chunk_size': 8192,
+            'buffer_size': 65536,
+            'retry_count': 3,
+            'retry_delay': 1.0,
+            'timeout': 30.0
+        }
+        self.transfer_coordinator = TransferCoordinator(self.transfer_settings)
+        
+        # Verbinde TransferCoordinator Signale mit dem Widget
+        self.logger.debug("Verbinde TransferCoordinator Signale mit dem Widget")
+        
+        # Verbinde Signale direkt mit Qt.DirectConnection um sicherzustellen, dass sie sofort verarbeitet werden
+        self.transfer_coordinator.transfer_started.connect(
+            self.transfer_widget.on_transfer_started,
+            type=Qt.DirectConnection
+        )
+        self.transfer_coordinator.transfer_progress.connect(
+            self.transfer_widget.on_transfer_progress,
+            type=Qt.DirectConnection
+        )
+        self.transfer_coordinator.transfer_completed.connect(
+            self.transfer_widget.on_transfer_completed,
+            type=Qt.DirectConnection
+        )
+        self.transfer_coordinator.transfer_error.connect(
+            self.transfer_widget.on_transfer_error,
+            type=Qt.DirectConnection
+        )
+        self.transfer_coordinator.transfer_paused.connect(
+            self.transfer_widget.on_transfer_paused,
+            type=Qt.DirectConnection
+        )
+        self.transfer_coordinator.transfer_resumed.connect(
+            self.transfer_widget.on_transfer_resumed,
+            type=Qt.DirectConnection
+        )
+        self.transfer_coordinator.transfer_cancelled.connect(
+            self.transfer_widget.on_transfer_cancelled,
+            type=Qt.DirectConnection
+        )
+        
+        # Verbinde Widget Signale mit dem Coordinator
+        self.transfer_widget.request_retry.connect(
+            self.transfer_coordinator.retry_transfer,
+            type=Qt.DirectConnection
+        )
+        self.transfer_widget.request_cancel.connect(
+            self.transfer_coordinator.cancel_transfer,
+            type=Qt.DirectConnection
+        )
+        self.transfer_widget.request_pause.connect(
+            self.transfer_coordinator.pause_transfer,
+            type=Qt.DirectConnection
+        )
+        self.transfer_widget.request_resume.connect(
+            self.transfer_coordinator.resume_transfer,
+            type=Qt.DirectConnection
+        )
+        
+        # Initialisiere FileWatcherManager
         self.file_watcher_manager = FileWatcherManager(self)  # Übergebe self als main_window
-        self.transfer_coordinator = TransferCoordinator(self.settings)
+        
+        # Verbinde FileWatcherManager Signale mit dem TransferCoordinator
+        self.file_watcher_manager.file_found.connect(
+            lambda file_path: self._handle_file_found(file_path)
+        )
         
         # Initialisiere Controller
         self.drive_controller = DriveController()
-        self.transfer_controller = TransferController()
         
         # Initialisiere Layout
         self.layout_manager = MainLayout(self)
@@ -235,13 +343,6 @@ class MainWindow(QMainWindow):
         self.drive_controller.drive_connected.connect(self.drive_event_handlers.on_drive_connected, Qt.QueuedConnection)
         self.drive_controller.drive_disconnected.connect(self.drive_event_handlers.on_drive_disconnected, Qt.QueuedConnection)
         self.drive_controller.file_found.connect(self.drive_event_handlers.on_file_found, Qt.QueuedConnection)
-        
-        # Verbinde Transfer-Coordinator Callbacks
-        self.transfer_coordinator.setup_callbacks(
-            progress_callback=self.transfer_event_handlers.on_transfer_progress,
-            completion_callback=self.transfer_event_handlers.on_transfer_completed,
-            error_callback=self.transfer_event_handlers.on_transfer_error
-        )
         
         # Initialisiere Shortcuts
         self.setup_shortcuts()
@@ -271,101 +372,248 @@ class MainWindow(QMainWindow):
         
         self._shutdown_thread = None
         self._is_shutting_down = False
-        self._app = app  # Speichere Referenz auf QApplication
         
-        self.setup_transfer_handlers()
+        # Debug-Logging für Signale
+        self.logger.debug("MainWindow initialisiert und Signale verbunden")
         
-    def setup_transfer_handlers(self):
-        """Richtet die Transfer-Handler ein."""
+    def _connect_transfer_signals(self):
+        """Verbindet die Transfer-Signale mit den UI-Updates."""
+        # Transfer Events vom Coordinator
+        self.transfer_coordinator.transfer_started.connect(self._on_transfer_started)
+        self.transfer_coordinator.transfer_progress.connect(self._on_transfer_progress)
+        self.transfer_coordinator.transfer_completed.connect(self._on_transfer_completed)
+        self.transfer_coordinator.transfer_error.connect(self._on_transfer_error)
+        
+    def _on_transfer_started(self, transfer_id: str):
+        """Handler für gestartete Transfers."""
         try:
-            # Connect transfer event handlers to progress widget
-            self.transfer_event_handlers.transfer_started.connect(self.progress_widget.add_drive)
-            self.transfer_event_handlers.transfer_progress.connect(self.progress_widget.update_drive_progress)
-            self.transfer_event_handlers.transfer_completed.connect(self.progress_widget.remove_drive)
-            self.transfer_event_handlers.transfer_error.connect(lambda drive_letter, _: self.progress_widget.remove_drive(drive_letter))
-            
-            # Connect file transfer manager signals if available
-            if hasattr(self.file_watcher_manager, 'transfer_manager'):
-                self.file_watcher_manager.transfer_manager.transfer_started.connect(
-                    self.transfer_event_handlers.on_transfer_started)
-                self.file_watcher_manager.transfer_manager.transfer_progress.connect(
-                    self.transfer_event_handlers.on_transfer_progress_file)
-                self.file_watcher_manager.transfer_manager.transfer_completed.connect(
-                    self.transfer_event_handlers.on_transfer_completed_file)
-                self.file_watcher_manager.transfer_manager.transfer_error.connect(
-                    self.transfer_event_handlers.on_transfer_error_file)
+            status = self.transfer_coordinator.get_transfer_status(transfer_id)
+            if status:
+                source_drive = os.path.splitdrive(status['source'])[0]
+                self.transfer_widget.add_drive(source_drive, f"Laufwerk {source_drive}")
                 
-            # Verbinde Abort-Button mit FileWatcherManager
-            self.abort_button.clicked.connect(self.file_watcher_manager.abort_transfers)
-            self.file_watcher_manager.transfer_manager.transfer_started.connect(lambda _: self.abort_button.setEnabled(True))
-            self.file_watcher_manager.transfer_manager.transfer_completed.connect(lambda _: self.abort_button.setEnabled(False))
-            self.file_watcher_manager.transfer_manager.transfer_error.connect(lambda _, __: self.abort_button.setEnabled(False))
-            self.file_watcher_manager.transfer_manager.transfer_aborted.connect(lambda: self.abort_button.setEnabled(False))
+                # Initialen Status setzen
+                self._on_transfer_progress(
+                    transfer_id=transfer_id,
+                    total_bytes=status['total_size'],
+                    transferred_bytes=0,
+                    speed=0.0
+                )
+        except Exception as e:
+            logger.error(f"Fehler beim Verarbeiten des Transfer-Starts: {e}")
+            
+    def _on_transfer_progress(self, transfer_id: str, total_bytes: int, 
+                          transferred_bytes: int, speed: float):
+        """Handler für Transfer-Fortschritt."""
+        try:
+            status = self.transfer_coordinator.get_transfer_status(transfer_id)
+            if status:
+                source_path = status['source']
+                source_drive = os.path.splitdrive(source_path)[0]
+                filename = os.path.basename(source_path)
+                
+                # Berechne Fortschritt
+                progress = (transferred_bytes / total_bytes * 100) if total_bytes > 0 else 0
+                
+                # Aktualisiere UI
+                self.transfer_widget.update_transfer(
+                    transfer_id=transfer_id,
+                    filename=filename,
+                    drive=source_drive,
+                    progress=progress,
+                    speed=speed,
+                    total_bytes=total_bytes,
+                    transferred_bytes=transferred_bytes,
+                    start_time=time.time(),  # Aktuelle Zeit als Fallback
+                    eta=status['eta']
+                )
+        except Exception as e:
+            logger.error(f"Fehler beim Aktualisieren des Transfer-Fortschritts: {e}")
+            
+    def _on_transfer_completed(self, transfer_id: str):
+        """Handler für abgeschlossene Transfers."""
+        try:
+            status = self.transfer_coordinator.get_transfer_status(transfer_id)
+            if status:
+                source_drive = os.path.splitdrive(status['source'])[0]
+                self.transfer_widget.remove_transfer(f"{source_drive}:{transfer_id}")
+        except Exception as e:
+            logger.error(f"Fehler beim Verarbeiten des Transfer-Abschlusses: {e}")
+            
+    def _on_transfer_error(self, transfer_id: str, error: str):
+        """Handler für Transfer-Fehler."""
+        try:
+            status = self.transfer_coordinator.get_transfer_status(transfer_id)
+            if status:
+                source_drive = os.path.splitdrive(status['source'])[0]
+                self.transfer_widget.remove_transfer(f"{source_drive}:{transfer_id}")
+                
+            # Zeige Fehlermeldung
+            self.show_error("Transfer-Fehler", f"Fehler beim Transfer: {error}")
+        except Exception as e:
+            logger.error(f"Fehler beim Verarbeiten des Transfer-Fehlers: {e}")
+            
+    def on_transfer_started(self, transfer_id: str):
+        """Handler für gestartete Transfers."""
+        try:
+            # Initialisiere Transfer-Status
+            self.transfers[transfer_id] = {
+                'filename': os.path.basename(transfer_id),
+                'drive': os.path.splitdrive(transfer_id)[0],
+                'progress': 0,
+                'speed': 0,
+                'total_bytes': 0,
+                'transferred_bytes': 0,
+                'start_time': time.time(),
+                'eta': timedelta.max
+            }
+            
+            # Füge Laufwerk zum Progress Widget hinzu falls noch nicht vorhanden
+            drive_letter = self.transfers[transfer_id]['drive'].rstrip('\\').rstrip(':')
+            if hasattr(self, 'transfer_widget'):
+                if drive_letter not in self.transfer_widget.drive_groups:
+                    self.transfer_widget.add_drive(drive_letter, f"Laufwerk {drive_letter}")
                 
         except Exception as e:
-            self.logger.error(f"Fehler beim Einrichten der Transfer-Handler: {e}", exc_info=True)
+            self.logger.error(f"Fehler beim Verarbeiten des Transfer-Starts: {str(e)}")
+
+    def on_transfer_progress(self, transfer_id: str, progress: float, speed: float):
+        """Handler für Transfer-Fortschritt."""
+        try:
+            if transfer_id not in self.transfers:
+                return
+                
+            transfer = self.transfers[transfer_id]
+            transfer['progress'] = progress
+            transfer['speed'] = speed
+            
+            # Aktualisiere Bytes-Statistiken
+            source = os.path.join(transfer['drive'], transfer['filename'])
+            if os.path.exists(source):
+                transfer['total_bytes'] = os.path.getsize(source)
+                transfer['transferred_bytes'] = int(transfer['total_bytes'] * (progress / 100))
+                
+                # Berechne ETA basierend auf aktueller Geschwindigkeit
+                if speed > 0:
+                    remaining_bytes = transfer['total_bytes'] - transfer['transferred_bytes']
+                    eta_seconds = remaining_bytes / speed
+                    transfer['eta'] = timedelta(seconds=int(eta_seconds))
+                else:
+                    transfer['eta'] = timedelta.max
+                    
+            # Aktualisiere Transfer im Progress Widget
+            self.transfer_widget.update_transfer(
+                transfer_id=transfer_id,
+                filename=transfer['filename'],
+                drive=transfer['drive'],
+                progress=progress / 100,  # Normalisiere auf 0-1
+                speed=speed,
+                total_bytes=transfer['total_bytes'],
+                transferred_bytes=transfer['transferred_bytes'],
+                start_time=transfer['start_time'],
+                eta=transfer['eta']
+            )
+            
+            # Aktualisiere Laufwerksstatus
+            drive_letter = transfer['drive'].rstrip('\\').rstrip(':')
+            self.update_drive_status(drive_letter, speed)
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Aktualisieren des Fortschritts: {str(e)}", exc_info=True)
+
+    def on_transfer_completed(self, transfer_id: str):
+        """Handler für abgeschlossene Transfers."""
+        try:
+            if transfer_id in self.transfers:
+                # Entferne Transfer aus Progress Widget
+                self.transfer_widget.remove_transfer(transfer_id)
+                
+                # Entferne aus Transfer-Status
+                del self.transfers[transfer_id]
+                
+                self.logger.info(f"Transfer abgeschlossen: {transfer_id}")
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Abschließen des Transfers: {str(e)}", exc_info=True)
+
+    def on_transfer_error(self, transfer_id: str, error: str):
+        """Handler für Transfer-Fehler."""
+        try:
+            # Zeige Fehlermeldung
+            if transfer_id in self.transfers:
+                filename = self.transfers[transfer_id]['filename']
+                self.show_error("Fehler beim Kopieren", f"Fehler beim Kopieren von {filename}: {error}")
+                
+                # Entferne fehlgeschlagenen Transfer
+                self.transfer_widget.remove_transfer(transfer_id)
+                del self.transfers[transfer_id]
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Verarbeiten des Transfer-Fehlers: {str(e)}", exc_info=True)
             
     def _setup_ui(self):
         """Initialisiert die UI-Komponenten."""
         try:
-            # Hauptlayout
-            self.central_widget = QWidget()
-            self.setCentralWidget(self.central_widget)
-            self.central_layout = QVBoxLayout()
-            self.central_layout.setContentsMargins(8, 8, 8, 8)
-            self.central_layout.setSpacing(8)
-            self.central_widget.setLayout(self.central_layout)
+            # Hauptwidget und Layout
+            central_widget = QWidget()
+            self.setCentralWidget(central_widget)
+            main_layout = QVBoxLayout(central_widget)
+            main_layout.setContentsMargins(10, 10, 10, 10)
+            main_layout.setSpacing(10)
             
-            # Style
-            self.setStyleSheet(StyleHelper.get_main_window_style())
-            self.central_widget.setStyleSheet(StyleHelper.get_widget_style())
-
-            # Mittlerer Bereich mit Progress Widget und DropZone
-            middle_layout = QHBoxLayout()
-            middle_layout.setSpacing(8)
+            # Oberer Bereich: Einstellungen und Steuerung
+            top_layout = QHBoxLayout()
             
-            # Progress Widget (80% der Breite)
-            self.progress_widget = ProgressWidget()
-            self.progress_widget.setStyleSheet(StyleHelper.get_widget_style())
-            middle_layout.addWidget(self.progress_widget, stretch=8)
-            
-            # DropZone (20% der Breite)
-            self.drop_zone = DropZone(self)
-            self.drop_zone.setStyleSheet(StyleHelper.get_widget_style())
-            self.drop_zone.setMinimumWidth(200)
-            middle_layout.addWidget(self.drop_zone, stretch=2)
-            
-            self.central_layout.addLayout(middle_layout)
-            
-            # Buttons
-            self.button_layout = QHBoxLayout()
-            self.button_layout.setSpacing(8)
-            
-            button_style = StyleHelper.get_button_style()
-            
-            self.start_button = QPushButton("Start")
-            self.start_button.setStyleSheet(button_style)
-            
-            self.cancel_button = QPushButton("Stop")
-            self.cancel_button.setStyleSheet(button_style)
-            
-            self.target_select_button = QPushButton("Ziel wählen")
-            self.target_select_button.setStyleSheet(button_style)
-            
-            self.button_layout.addWidget(self.start_button)
-            self.button_layout.addWidget(self.cancel_button)
-            self.button_layout.addWidget(self.target_select_button)
+            # Linke Seite: Laufwerke und Zuordnungen
+            left_widget = QWidget()
+            left_layout = QVBoxLayout(left_widget)
+            left_layout.setContentsMargins(0, 0, 0, 0)
             
             # Laufwerksliste
-            self.drive_list = QListWidget()
-            self.drive_list.setStyleSheet(StyleHelper.get_list_style())
+            drives_group = QGroupBox("Verfügbare Laufwerke")
+            drives_group.setStyleSheet(StyleHelper.get_group_box_style())
+            drives_layout = QVBoxLayout(drives_group)
+            drives_layout.addWidget(self.drives_list)
+            left_layout.addWidget(drives_group)
             
-            # Layout zusammenbauen
-            self.central_layout.addLayout(self.button_layout)
-            self.central_layout.addWidget(self.drive_list)
+            # Zuordnungen
+            mappings_group = QGroupBox("Dateizuordnungen")
+            mappings_group.setStyleSheet(StyleHelper.get_group_box_style())
+            mappings_layout = QVBoxLayout(mappings_group)
+            mappings_layout.addWidget(self.mappings_list)
+            left_layout.addWidget(mappings_group)
+            
+            top_layout.addWidget(left_widget)
+            
+            # Rechte Seite: Fortschritt und Steuerung
+            right_widget = QWidget()
+            right_layout = QVBoxLayout(right_widget)
+            right_layout.setContentsMargins(0, 0, 0, 0)
+            
+            # Fortschrittsanzeige
+            self.transfer_widget.setMinimumHeight(400)
+            right_layout.addWidget(self.transfer_widget, stretch=1)
+            
+            # Steuerungsbuttons
+            button_layout = QHBoxLayout()
+            button_layout.addWidget(self.start_button)
+            button_layout.addWidget(self.cancel_button)
+            button_layout.addWidget(self.abort_button)
+            right_layout.addLayout(button_layout)
+            
+            top_layout.addWidget(right_widget, stretch=2)
+            
+            main_layout.addLayout(top_layout)
+            
+            # Statusleiste
+            status_layout = QHBoxLayout()
+            self.status_label = QLabel()
+            self.status_label.setStyleSheet("color: white;")
+            status_layout.addWidget(self.status_label)
+            main_layout.addLayout(status_layout)
             
         except Exception as e:
-            self.logger.error(f"Fehler beim Setup der UI: {e}", exc_info=True)
+            self.logger.error(f"Fehler beim Initialisieren der UI: {str(e)}", exc_info=True)
         
     def setup_shortcuts(self):
         """Richtet Tastatur-Shortcuts ein."""
@@ -379,115 +627,55 @@ class MainWindow(QMainWindow):
         
     def _on_drive_connected(self, drive_letter: str):
         """Handler für neue Laufwerksverbindung."""
-        # Prüfe ob das Laufwerk ausgeschlossen ist
-        excluded_drives = [
-            self.excluded_list.item(i).text() 
-            for i in range(self.excluded_list.count())
-        ]
-        
-        if drive_letter not in excluded_drives:
-            # Füge Laufwerk zum Progress Widget hinzu
-            self.progress_widget.add_drive(drive_letter, f"Laufwerk {drive_letter}")
-            
-            # Automatischer Start wenn aktiviert
-            if self.auto_start_checkbox.isChecked():
-                source_files = self.transfer_handlers.get_source_files(drive_letter)
-                if source_files:
-                    # Nutze hohe Priorität für Auto-Start
-                    for source_file in source_files:
-                        target_file = os.path.join(
-                            self.target_path_edit.text(),
-                            os.path.basename(source_file)
-                        )
-                        self.transfer_coordinator.start_copy_for_files([source_file], target_file)
-        
-        # UI Update
-        self.drive_handlers.on_drive_connected(drive_letter)
-        self.update_filtered_drives_list()
-        
-    def _on_drive_disconnected(self, drive_letter: str):
-        """Handler für getrennte Laufwerksverbindung."""
-        # Entferne Laufwerk aus Progress Widget
-        self.progress_widget.remove_drive(drive_letter)
-        
-        # Pausiere alle Transfers von diesem Laufwerk
-        self.transfer_coordinator.pause_copy(drive_letter)
-        
-        # UI Update
-        self.drive_handlers.on_drive_disconnected(drive_letter)
-        self.update_filtered_drives_list()
-        
-    def _on_transfer_progress(self, transfer_id: str, progress: float):
-        """Callback für Transfer-Fortschritt."""
         try:
-            # Hole Transfer-Status
-            transfer = self.transfer_coordinator.get_transfer_status(transfer_id)
-            if transfer:
-                # Extrahiere Informationen
-                source_file = transfer.get('source_file', '')
-                drive_letter = os.path.splitdrive(source_file)[0].rstrip(':')
-                filename = os.path.basename(source_file)
-                speed = transfer.get('speed', 0)
-                
-                # Aktualisiere Progress Widget
-                self.progress_widget.update_drive_progress(
-                    drive_letter=drive_letter,
-                    filename=filename,
-                    progress=progress,
-                    speed=speed
-                )
-                
-        except Exception as e:
-            self.logger.error(f"Fehler beim Aktualisieren des Fortschritts: {str(e)}")
+            # Hole ausgeschlossene Laufwerke
+            excluded_drives = []
+            for i in range(self.excluded_list.count()):
+                item = self.excluded_list.item(i)
+                drive = item.text().strip()
+                if drive:  # Nur nicht-leere Laufwerke hinzufügen
+                    excluded_drives.append(drive)
             
-    def _on_transfer_completed(self, transfer_id: str):
-        """Callback für abgeschlossene Transfers."""
-        try:
-            transfer = self.transfer_coordinator.get_transfer_status(transfer_id)
-            if transfer:
-                # Extrahiere Informationen
-                source_file = transfer.get('source_file', '')
-                drive_letter = os.path.splitdrive(source_file)[0].rstrip(':')
-                filename = os.path.basename(source_file)
-                
-                # Aktualisiere Progress Widget
-                self.progress_widget.update_drive_progress(
-                    drive_letter=drive_letter,
-                    filename=filename,
-                    progress=100,
-                    speed=0
-                )
-                
-        except Exception as e:
-            self.logger.error(f"Fehler beim Abschließen des Transfers: {str(e)}")
+            self.logger.debug(f"Ausgeschlossene Laufwerke: {excluded_drives}")
             
-    def _on_transfer_error(self, transfer_id: str, error: str):
-        """Callback für Transfer-Fehler."""
-        try:
-            transfer = self.transfer_coordinator.get_transfer_status(transfer_id)
-            if transfer:
-                # Extrahiere Informationen
-                source_file = transfer.get('source_file', '')
-                drive_letter = os.path.splitdrive(source_file)[0].rstrip(':')
-                filename = os.path.basename(source_file)
-                
-                # Zeige Fehlermeldung
-                QMessageBox.warning(
-                    self,
-                    "Fehler beim Transfer",
-                    f"Der Transfer von {filename} konnte nicht abgeschlossen werden: {error}"
-                )
-                
-                # Aktualisiere Progress Widget
-                self.progress_widget.update_drive_progress(
-                    drive_letter=drive_letter,
-                    filename=filename,
+            if drive_letter not in excluded_drives:
+                # Initialisiere Laufwerksgruppe im Progress Widget
+                self.transfer_widget.update_transfer(
+                    transfer_id=f"{drive_letter}:init",
+                    filename="Initialisierung...",
+                    drive=f"Laufwerk {drive_letter}",
                     progress=0,
-                    speed=0
+                    speed=0,
+                    total_bytes=0,
+                    transferred_bytes=0
                 )
+                
+                # Automatischer Start wenn aktiviert
+                if self.auto_start_checkbox.isChecked():
+                    self.start_copy(drive_letter)
+                
+        except Exception as e:
+            self.logger.error(f"Fehler beim Verarbeiten der Laufwerksverbindung: {str(e)}", exc_info=True)
+
+    def _on_drive_disconnected(self, drive_letter):
+        """Handler für getrennte Laufwerksverbindung."""
+        try:
+            # Entferne das Laufwerk aus der Liste
+            self.drives_list.remove_drive(drive_letter)
+            
+            # Stoppe alle Kopiervorgänge von diesem Laufwerk
+            affected_tasks = [task_id for task_id, copy in self.active_copies.items()
+                             if copy["source_drive"] == drive_letter]
+        
+            for task_id in affected_tasks:
+                self.transfer_coordinator.set_task_error(task_id, "Laufwerk getrennt")
+                del self.active_copies[task_id]
+                
+            logger.warning(f"Laufwerk {drive_letter} wurde getrennt. "
+                          f"{len(affected_tasks)} Kopiervorgänge abgebrochen.")
             
         except Exception as e:
-            self.logger.error(f"Fehler beim Fehlerhandling: {str(e)}")
+            self.logger.error(f"Fehler beim Verarbeiten der Laufwerkstrennung: {str(e)}", exc_info=True)
             
     def update_statistics(self, transfer: dict):
         """Aktualisiert die Statistiken für einen Transfer."""
@@ -815,8 +1003,8 @@ class MainWindow(QMainWindow):
         """Wird aufgerufen, wenn sich der Fortschritt eines Kopiervorgangs ändert."""
         try:
             # Aktualisiere Fortschritt im UI
-            if hasattr(self, 'progress_widget'):
-                self.progress_widget.update_drive_progress(
+            if hasattr(self, 'transfer_widget'):
+                self.transfer_widget.update_drive_progress(
                     drive_letter,
                     filename,
                     progress,
@@ -836,10 +1024,10 @@ class MainWindow(QMainWindow):
         try:
             # Finde alle aktiven Kopien für dieses Laufwerk
             active_count = 0
-            if hasattr(self, 'progress_widget'):
+            if hasattr(self, 'transfer_widget'):
                 # Prüfe ob das Laufwerk aktive Transfers hat
-                if drive_letter in self.progress_widget.drive_widgets:
-                    active_count = len(self.progress_widget.active_transfers)
+                if drive_letter in self.transfer_widget.drive_widgets:
+                    active_count = len(self.transfer_widget.active_transfers)
 
             # Aktualisiere die Laufwerksanzeige
             if hasattr(self, 'drive_widget'):
@@ -1065,24 +1253,24 @@ class MainWindow(QMainWindow):
     def _on_exclude_all_clicked(self):
         """Schließt alle verfügbaren Laufwerke aus."""
         try:
-            # Hole alle verfügbaren Laufwerke
-            available_drives = []
-            for drive_letter, drive_item in self.drive_items.items():
-                if not drive_item.is_excluded:
-                    available_drives.append(drive_letter)
+            # Leere die Liste
+            self.excluded_list.clear()
+            self.excluded_drives.clear()
             
-            # Füge sie zur Ausschlussliste hinzu
-            for drive_letter in available_drives:
-                # Prüfe ob das Laufwerk bereits ausgeschlossen ist
-                already_excluded = False
-                for i in range(self.excluded_list.count()):
-                    if self.excluded_list.item(i).text() == drive_letter:
-                        already_excluded = True
-                        break
-                
-                if not already_excluded:
-                    self.excluded_list.addItem(drive_letter)
+            # Füge alle Laufwerksbuchstaben hinzu (außer D:)
+            all_drives = ['A', 'B', 'C', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+                         'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
             
+            for drive in all_drives:
+                if drive != 'D':
+                    item = QListWidgetItem(drive)
+                    self.excluded_list.addItem(item)
+                    self.excluded_drives.append(drive)
+            
+            # Aktualisiere die gefilterte Liste
+            self.update_filtered_drives_list()
+            
+            # Speichere die Einstellungen
             self.save_settings()
             
         except Exception as e:
@@ -1107,11 +1295,30 @@ class MainWindow(QMainWindow):
             text = item.text()
             # Prüfe beide Formate
             if text.startswith(f"*.{file_type} ➔ ") or text.startswith(f".{file_type} ➔ "):
-                self.logger.debug(f"Zuordnung gefunden für {file_type}: {text}")
-                return text.split(" ➔ ")[1].strip()
+                target_dir = text.split(" ➔ ")[1].strip()
+                self.logger.debug(f"Zuordnung gefunden für {file_type}: {target_dir}")
+                return target_dir
                 
         self.logger.debug(f"Keine Zuordnung gefunden für {file_type}")
         return None
+
+    def _get_target_path(self, source_file: str, target_dir: str) -> str:
+        """Erstellt den vollständigen Zielpfad für eine Datei.
+        
+        Args:
+            source_file: Pfad zur Quelldatei
+            target_dir: Zielverzeichnis
+            
+        Returns:
+            Vollständiger Zielpfad für die Datei
+        """
+        if not source_file or not target_dir:
+            return None
+            
+        # Extrahiere Dateinamen aus Quellpfad
+        filename = os.path.basename(source_file)
+        # Erstelle vollständigen Zielpfad
+        return os.path.join(target_dir, filename)
 
     def start_copy_for_files(self, files: list):
         """Startet den Kopiervorgang für eine Liste von Dateien."""
@@ -1126,49 +1333,20 @@ class MainWindow(QMainWindow):
                     if file_type not in files_by_type:
                         files_by_type[file_type] = []
                     files_by_type[file_type].append(file_path)
-            
-            # Starte Kopiervorgang für jeden Dateityp
-            for file_type, type_files in files_by_type.items():
-                # Hole die Zuordnung für diesen Dateityp
+                    
+            # Starte Transfer für jede Dateigruppe
+            for file_type, file_list in files_by_type.items():
                 target_dir = self.get_mapping_for_type(file_type)
                 if target_dir:
-                    target_dir = target_dir.strip()
-                    self.logger.info(f"Gefundene Zuordnung für {file_type}: {target_dir}")
-                    
-                    if target_dir:
-                        # Stelle sicher, dass das Zielverzeichnis existiert
-                        os.makedirs(target_dir, exist_ok=True)
-                        
-                        # Füge jeden Transfer einzeln hinzu
-                        for source_file in type_files:
-                            try:
-                                # Bestimme den Zieldateipfad
-                                filename = os.path.basename(source_file)
-                                target_path = os.path.join(target_dir, filename)
-                                
-                                # Prüfe ob die Datei bereits existiert
-                                if os.path.exists(target_path):
-                                    if os.path.getsize(source_file) == os.path.getsize(target_path):
-                                        self.logger.info(f"Überspringe identische Datei: {filename}")
-                                        continue
-                                    else:
-                                        # Generiere neuen Dateinamen
-                                        base, ext = os.path.splitext(filename)
-                                        counter = 1
-                                        while os.path.exists(target_path):
-                                            new_name = f"{base} ({counter}){ext}"
-                                            target_path = os.path.join(target_dir, new_name)
-                                            counter += 1
-                                
-                                self.logger.info(f"Starte Transfer: {source_file} -> {target_path}")
-                                self.file_watcher_manager.transfer_manager.transfer_file(source_file, target_path)
-                                
-                            except Exception as e:
-                                self.logger.error(f"Fehler beim Transfer von {source_file}: {e}")
-                                self.show_error("Fehler", f"Fehler beim Transfer von {os.path.basename(source_file)}:\n{str(e)}")
+                    for source_file in file_list:
+                        target_path = self._get_target_path(source_file, target_dir)
+                        if target_path:
+                            self.transfer_coordinator.start_transfer(source_file, target_path)
+                        else:
+                            self.logger.error(f"Konnte Zielpfad nicht erstellen für {source_file}")
                 else:
-                    self.logger.warning(f"Keine Zuordnung gefunden für Dateityp: {file_type}")
-            
+                    self.logger.warning(f"Keine Zuordnung gefunden für Dateityp {file_type}")
+                    
         except Exception as e:
             self.logger.error(f"Fehler beim Starten des Kopiervorgangs: {e}")
             self.show_error("Fehler", f"Fehler beim Starten des Kopiervorgangs:\n{str(e)}")
@@ -1273,20 +1451,20 @@ class MainWindow(QMainWindow):
             self.logger.debug(f"Gefundene Dateitypen: {file_types}")
             self.logger.debug(f"Gefundene Zuordnungen: {mappings}")
             
-            # Hole ausgeschlossene Laufwerke
-            excluded_drives = []
+            # Aktualisiere die Liste der ausgeschlossenen Laufwerke
+            self.excluded_drives.clear()
             for i in range(self.excluded_list.count()):
-                drive = self.excluded_list.item(i).text()
-                # Normalisiere Laufwerksbuchstaben (entferne : und \)
-                drive = drive.rstrip(':\\')
-                excluded_drives.append(drive)
+                item = self.excluded_list.item(i)
+                drive = item.text().strip()
+                if drive:  # Nur nicht-leere Laufwerke hinzufügen
+                    self.excluded_drives.append(drive)
             
-            self.logger.debug(f"Ausgeschlossene Laufwerke: {excluded_drives}")
+            self.logger.debug(f"Ausgeschlossene Laufwerke: {self.excluded_drives}")
             
             # Aktualisiere Status aller Laufwerke
             for drive_letter, drive_item in self.drive_items.items():
                 normalized_drive = drive_letter.rstrip(':\\')
-                is_excluded = normalized_drive in excluded_drives
+                is_excluded = normalized_drive in self.excluded_drives
                 
                 # Aktualisiere den Status im DriveListItem
                 drive_item.update_excluded_status(is_excluded)
@@ -1310,10 +1488,12 @@ class MainWindow(QMainWindow):
                         new_item._update_display()
             
             self.logger.debug(f"Gefilterte Laufwerksliste aktualisiert: {self.filtered_drives_list.count()} Laufwerke")
+            
+            # Speichere die Einstellungen
             self.save_settings()
             
         except Exception as e:
-            self.logger.error(f"Fehler beim Aktualisieren der gefilterten Laufwerksliste: {e}", exc_info=True)
+            self.logger.error(f"Fehler beim Aktualisieren der gefilterten Laufwerksliste: {e}")
             
     def _has_matching_files(self, drive_letter: str) -> bool:
         """Prüft ob ein Laufwerk Dateien enthält, die den konfigurierten Zuordnungen entsprechen.
@@ -1417,11 +1597,13 @@ class MainWindow(QMainWindow):
         """Interner Handler für Start/Stop Button."""
         try:
             if not self.is_watching:
+                self.toggle_watcher(True)
                 self.event_handlers.on_start_clicked()
             else:
+                self.toggle_watcher(False)
                 self.event_handlers.on_stop_clicked()
         except Exception as e:
-            logger.error(f"Fehler beim Verarbeiten des Start/Stop-Klicks: {e}")
+            self.logger.error(f"Fehler beim Verarbeiten des Start/Stop-Klicks: {e}")
 
     def _process_mapping(self, mapping_text: str) -> Tuple[str, str]:
         """Verarbeitet einen Zuordnungstext und gibt Dateityp und Zielpfad zurück."""
@@ -1476,46 +1658,59 @@ class MainWindow(QMainWindow):
         """Aktualisiert den Fortschritt für eine Datei."""
         try:
             # Get drive letter from filename
-            drive_letter = os.path.splitdrive(filename)[0]
-            if drive_letter:
-                drive_letter = drive_letter.rstrip(':')  # Remove colon if present
-                
-                # Calculate transfer speed (simplified)
-                elapsed_time = time.time() 
-                if elapsed_time > 0:
-                    file_size = os.path.getsize(os.path.join(drive_letter + ":", filename))
-                    speed = (file_size * (progress / 100)) / elapsed_time / (1024 * 1024)  # MB/s
+            drive_letter = self.target_path_edit.text()[:1].upper()
+            
+            # Aktualisiere Progress Widget
+            if hasattr(self, 'transfer_widget'):
+                # Hole Dateigrößen
+                source = os.path.join(drive_letter + ":", filename)
+                if os.path.exists(source):
+                    total_bytes = os.path.getsize(source)
+                    transferred_bytes = int(total_bytes * (progress / 100))
                 else:
-                    speed = 0
+                    total_bytes = 0
+                    transferred_bytes = 0
+                    
+                # Generiere eindeutige Transfer-ID
+                transfer_id = f"{drive_letter}:{filename}"
                 
-                # Update progress widget
-                self.progress_widget.update_drive_progress(
-                    drive_letter=drive_letter,
-                    filename=os.path.basename(filename),
+                # Aktualisiere Transfer
+                self.transfer_widget.update_transfer(
+                    transfer_id=transfer_id,
+                    filename=filename,
+                    drive=f"Laufwerk {drive_letter}",
                     progress=progress,
-                    speed=speed
+                    speed=0,
+                    total_bytes=total_bytes,
+                    transferred_bytes=transferred_bytes
                 )
-                
+            
         except Exception as e:
             self.logger.error(f"Fehler beim Aktualisieren des Fortschritts: {str(e)}", exc_info=True)
 
     def _connect_signals(self):
         """Verbindet die Signal-Handler."""
-        # Drive Handler Signale
-        self.drive_handlers.drive_connected.connect(self._on_drive_connected)
-        self.drive_handlers.drive_disconnected.connect(self._on_drive_disconnected)
-        
-        # Transfer Handler Signale
-        self.transfer_coordinator.transfer_started.connect(self._on_transfer_started)
-        self.transfer_coordinator.transfer_progress.connect(self._on_transfer_progress)
-        self.transfer_coordinator.transfer_completed.connect(self._on_transfer_completed)
-        self.transfer_coordinator.transfer_error.connect(self._on_transfer_error)
-        
-        # Button Signale
-        self.start_button.clicked.connect(self._on_start_clicked)
-        self.cancel_button.clicked.connect(self._on_cancel_clicked)
-        self.target_select_button.clicked.connect(self._on_browse_clicked)
-        
+        try:
+            # Drive Handler Signale
+            self.drive_handlers.drive_connected.connect(self._on_drive_connected)
+            self.drive_handlers.drive_disconnected.connect(self._on_drive_disconnected)
+            
+            # Transfer Handler Signale
+            self.transfer_coordinator.transfer_started.connect(self._on_transfer_started)
+            self.transfer_coordinator.transfer_progress.connect(self._on_transfer_progress)
+            self.transfer_coordinator.transfer_completed.connect(self._on_transfer_completed)
+            self.transfer_coordinator.transfer_error.connect(self._on_transfer_error)
+            
+            # Button Signale
+            self.start_button.clicked.connect(self._on_start_clicked)
+            self.cancel_button.clicked.connect(self._on_cancel_clicked)
+            self.target_select_button.clicked.connect(self._on_browse_clicked)
+            
+            self.logger.debug("Signale erfolgreich verbunden")
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Verbinden der Signale: {e}", exc_info=True)
+            raise  # Re-raise the exception after logging
 
     def showEvent(self, event):
         """Wird aufgerufen, wenn das Fenster angezeigt wird."""
@@ -1525,8 +1720,8 @@ class MainWindow(QMainWindow):
             screen = self.screen()
             screen_geometry = screen.geometry()
             x = (screen_geometry.width() - 1440) // 2
-            y = (screen_geometry.height() - 1230) // 2
-            self.setGeometry(x, y, 1440, 1230)
+            y = (screen_geometry.height() - 1000) // 2
+            self.setGeometry(x, y, 1440, 1000)
             self._first_show = False
 
     def update_drive_status(self, drive_letter: str, speed: float):
@@ -1534,10 +1729,10 @@ class MainWindow(QMainWindow):
         try:
             # Finde alle aktiven Kopien für dieses Laufwerk
             active_count = 0
-            if hasattr(self, 'progress_widget'):
+            if hasattr(self, 'transfer_widget'):
                 # Prüfe ob das Laufwerk aktive Transfers hat
-                if drive_letter in self.progress_widget.drive_widgets:
-                    active_count = len(self.progress_widget.active_transfers)
+                if drive_letter in self.transfer_widget.drive_widgets:
+                    active_count = len(self.transfer_widget.active_transfers)
 
             # Aktualisiere die Laufwerksanzeige
             if hasattr(self, 'drive_widget'):
@@ -1545,3 +1740,342 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             self.logger.error(f"Fehler beim Aktualisieren des Laufwerksstatus: {e}")
+
+    def _setup_transfer_section(self):
+        """Richtet die Transfer-Sektion ein."""
+        # Transfer Widget
+        self.transfer_widget = ModernTransferWidget()
+        
+        # Verbinde Transfer Coordinator
+        self.transfer_coordinator.transfer_started.connect(
+            self._on_transfer_started
+        )
+        self.transfer_coordinator.transfer_progress.connect(
+            self._on_transfer_progress
+        )
+        self.transfer_coordinator.transfer_completed.connect(
+            self._on_transfer_completed
+        )
+        self.transfer_coordinator.transfer_error.connect(
+            self._on_transfer_error
+        )
+        
+        # Verbinde Widget Signale
+        self.transfer_widget.transfer_cancelled.connect(
+            self.transfer_coordinator.cancel_transfer
+        )
+        self.transfer_widget.transfer_retry.connect(
+            self.transfer_coordinator.retry_transfer
+        )
+        
+        # Füge Widget zum Layout hinzu
+        self.right_sidebar.addWidget(self.transfer_widget)
+        
+    def _on_transfer_started(self, transfer_id: str):
+        """Handler für gestartete Transfers."""
+        try:
+            # Initialisiere Transfer im Widget
+            self.transfer_widget.update_transfer(
+                transfer_id=transfer_id,
+                filename="",
+                progress=0,
+                speed=0,
+                total_bytes=0,
+                transferred_bytes=0,
+                start_time=time.time(),
+                eta=timedelta.max
+            )
+            
+            # Zeige Statusmeldung
+            self.show_status_message(
+                f"Transfer gestartet: {transfer_id}",
+                timeout=3000
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Starten des Transfers: {e}")
+            
+    def _on_transfer_progress(self, transfer_id: str, progress: float, speed: float, eta: timedelta, total: int, transferred: int):
+        """Handler für Transfer-Fortschritt."""
+        try:
+            # Hole Transfer-Info
+            transfer = self.transfer_coordinator.get_transfer_status(transfer_id)
+            if not transfer:
+                return
+                
+            # Update Widget
+            self.transfer_widget.update_transfer(
+                transfer_id=transfer_id,
+                filename=transfer['filename'],
+                progress=progress,
+                speed=speed,
+                total_bytes=total,
+                transferred_bytes=transferred,
+                start_time=transfer['start_time'],
+                eta=eta
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Update des Transfers: {e}")
+            
+    def _on_transfer_completed(self, transfer_id: str):
+        """Handler für abgeschlossene Transfers."""
+        try:
+            # Hole Transfer-Info
+            transfer = self.transfer_coordinator.get_transfer_status(transfer_id)
+            if not transfer:
+                return
+                
+            # Entferne aus Widget
+            self.transfer_widget.remove_transfer(transfer_id)
+            
+            # Zeige Erfolgsmeldung
+            self.show_status_message(
+                f"Transfer abgeschlossen: {transfer['filename']}",
+                timeout=3000
+            )
+            
+            # Aktualisiere UI
+            self.refresh_current_view()
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Abschließen des Transfers: {e}")
+            
+    def _on_transfer_error(self, transfer_id: str, error: str):
+        """Handler für Transfer-Fehler."""
+        try:
+            # Hole Transfer-Info
+            transfer = self.transfer_coordinator.get_transfer_status(transfer_id)
+            if not transfer:
+                return
+                
+            # Zeige Fehler im Widget
+            self.transfer_widget.handle_error(
+                transfer_id,
+                error,
+                error_type="error"
+            )
+            
+            # Zeige Fehlermeldung
+            self.show_error_message(
+                f"Fehler beim Transfer von {transfer['filename']}: {error}"
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Fehler bei der Fehlerbehandlung: {e}")
+            
+    def show_status_message(self, message: str, timeout: int = 0):
+        """Zeigt eine Statusmeldung in der Statusleiste an."""
+        try:
+            self.statusBar().showMessage(message, timeout)
+        except Exception as e:
+            self.logger.error(f"Fehler beim Anzeigen der Statusmeldung: {e}")
+            
+    def show_error_message(self, message: str):
+        """Zeigt eine Fehlermeldung im Error Dialog an."""
+        try:
+            QMessageBox.critical(
+                self,
+                "Fehler",
+                message,
+                QMessageBox.Ok
+            )
+        except Exception as e:
+            self.logger.error(f"Fehler beim Anzeigen der Fehlermeldung: {e}")
+
+    def _setup_transfer_coordinator(self):
+        """Richtet den TransferCoordinator ein."""
+        self.logger.debug("Richte TransferCoordinator ein")
+        try:
+            # Erstelle TransferCoordinator
+            self.transfer_coordinator = TransferCoordinator()
+            
+            # Verbinde Signale mit Qt.QueuedConnection
+            self.transfer_coordinator.transfer_started.connect(
+                self.transfer_widget.on_transfer_started,
+                type=Qt.QueuedConnection
+            )
+            self.transfer_coordinator.transfer_progress.connect(
+                self.transfer_widget.on_transfer_progress,
+                type=Qt.QueuedConnection
+            )
+            self.transfer_coordinator.transfer_completed.connect(
+                self.transfer_widget.on_transfer_completed,
+                type=Qt.QueuedConnection
+            )
+            self.transfer_coordinator.transfer_error.connect(
+                self.transfer_widget.on_transfer_error,
+                type=Qt.QueuedConnection
+            )
+            self.transfer_coordinator.transfer_paused.connect(
+                self.transfer_widget.on_transfer_paused,
+                type=Qt.QueuedConnection
+            )
+            self.transfer_coordinator.transfer_resumed.connect(
+                self.transfer_widget.on_transfer_resumed,
+                type=Qt.QueuedConnection
+            )
+            self.transfer_coordinator.transfer_cancelled.connect(
+                self.transfer_widget.on_transfer_cancelled,
+                type=Qt.QueuedConnection
+            )
+            
+            # Starte Queue-Verarbeitung
+            self.transfer_coordinator.start()
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Einrichten des TransferCoordinator: {e}", exc_info=True)
+
+    def _connect_signals(self):
+        """Verbindet die Signale der UI-Komponenten."""
+        try:
+            # Verbinde Transfer-Signale
+            if hasattr(self.transfer_widget, 'on_transfer_started'):
+                self.transfer_coordinator.transfer_started.connect(
+                    self.transfer_widget.on_transfer_started,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_transfer_progress'):
+                self.transfer_coordinator.transfer_progress.connect(
+                    self.transfer_widget.on_transfer_progress,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_transfer_completed'):
+                self.transfer_coordinator.transfer_completed.connect(
+                    self.transfer_widget.on_transfer_completed,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_transfer_error'):
+                self.transfer_coordinator.transfer_error.connect(
+                    self.transfer_widget.on_transfer_error,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_transfer_paused'):
+                self.transfer_coordinator.transfer_paused.connect(
+                    self.transfer_widget.on_transfer_paused,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_transfer_resumed'):
+                self.transfer_coordinator.transfer_resumed.connect(
+                    self.transfer_widget.on_transfer_resumed,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_transfer_cancelled'):
+                self.transfer_coordinator.transfer_cancelled.connect(
+                    self.transfer_widget.on_transfer_cancelled,
+                    type=Qt.QueuedConnection
+                )
+            
+            # Verbinde Batch-Signale
+            if hasattr(self.transfer_widget, 'on_batch_started'):
+                self.transfer_coordinator.batch_started.connect(
+                    self.transfer_widget.on_batch_started,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_batch_progress'):
+                self.transfer_coordinator.batch_progress.connect(
+                    self.transfer_widget.on_batch_progress,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_batch_completed'):
+                self.transfer_coordinator.batch_completed.connect(
+                    self.transfer_widget.on_batch_completed,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_batch_error'):
+                self.transfer_coordinator.batch_error.connect(
+                    self.transfer_widget.on_batch_error,
+                    type=Qt.QueuedConnection
+                )
+            
+            self.logger.debug("Signale erfolgreich verbunden")
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Verbinden der Signale: {e}", exc_info=True)
+            raise  # Re-raise the exception after logging
+
+    def _connect_signals(self):
+        """Verbindet die Signale der UI-Komponenten."""
+        try:
+            # Verbinde Transfer-Signale
+            if hasattr(self.transfer_widget, 'on_transfer_started'):
+                self.transfer_coordinator.transfer_started.connect(
+                    self.transfer_widget.on_transfer_started,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_transfer_progress'):
+                self.transfer_coordinator.transfer_progress.connect(
+                    self.transfer_widget.on_transfer_progress,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_transfer_completed'):
+                self.transfer_coordinator.transfer_completed.connect(
+                    self.transfer_widget.on_transfer_completed,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_transfer_error'):
+                self.transfer_coordinator.transfer_error.connect(
+                    self.transfer_widget.on_transfer_error,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_transfer_paused'):
+                self.transfer_coordinator.transfer_paused.connect(
+                    self.transfer_widget.on_transfer_paused,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_transfer_resumed'):
+                self.transfer_coordinator.transfer_resumed.connect(
+                    self.transfer_widget.on_transfer_resumed,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_transfer_cancelled'):
+                self.transfer_coordinator.transfer_cancelled.connect(
+                    self.transfer_widget.on_transfer_cancelled,
+                    type=Qt.QueuedConnection
+                )
+            
+            # Verbinde Batch-Signale
+            if hasattr(self.transfer_widget, 'on_batch_started'):
+                self.transfer_coordinator.batch_started.connect(
+                    self.transfer_widget.on_batch_started,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_batch_progress'):
+                self.transfer_coordinator.batch_progress.connect(
+                    self.transfer_widget.on_batch_progress,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_batch_completed'):
+                self.transfer_coordinator.batch_completed.connect(
+                    self.transfer_widget.on_batch_completed,
+                    type=Qt.QueuedConnection
+                )
+            
+            if hasattr(self.transfer_widget, 'on_batch_error'):
+                self.transfer_coordinator.batch_error.connect(
+                    self.transfer_widget.on_batch_error,
+                    type=Qt.QueuedConnection
+                )
+            
+            self.logger.debug("Signale erfolgreich verbunden")
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Verbinden der Signale: {e}", exc_info=True)
+            raise  # Re-raise the exception after logging

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from core.drive_controller import DriveController
-from .widgets.custom_list import CustomListWidget
+from ui.widgets.custom_list_widget import CustomListWidget
 
 class DrivesSection(QWidget):
     """Laufwerks-Sektion des Hauptfensters."""

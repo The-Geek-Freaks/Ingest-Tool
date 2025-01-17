@@ -17,10 +17,16 @@ from .top_layout import create_top_layout
 from .middle_layout import create_middle_layout
 from .settings_layout import create_settings_layout
 from .progress_layout import create_progress_layout
+from ui.style_helper import StyleHelper
 from ui.widgets.drop_zone import DropZone
 from ui.widgets.ingesting_drives_widget import IngestingDrivesWidget
-from ui.widgets.progress_widget import ProgressWidget
+from ui.widgets import ModernTransferWidget
 from utils.logging_widgets import QTextEditLogger
+from ui.widgets.header_widget import HeaderWidget
+from ui.widgets.theme_toggle_button import ThemeToggleButton
+from ui.theme_manager import ThemeManager
+from ui.sections.header_section import HeaderSection
+from PyQt5.QtGui import QFont
 
 class MainLayout:
     """Verwaltet das Layout des Hauptfensters."""
@@ -30,60 +36,54 @@ class MainLayout:
         
     def setup_ui(self):
         """Erstellt das komplette UI-Layout."""
+        # Theme Manager initialisieren
+        self.theme_manager = ThemeManager()
+        
         # Erstelle ein zentrales Widget
         central_widget = QWidget()
         self.main_window.setCentralWidget(central_widget)
         
-        # Hauptlayout (Horizontal für Sidebar)
+        # Hauptlayout (Vertikal)
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setSpacing(0)
+        main_layout.setSpacing(0)  
         main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Header hinzufügen
+        from ui.sections.header_section import HeaderSection
+        header = HeaderSection()
+        # Keine fixe Höhe mehr, lasse das Banner die Höhe bestimmen
+        main_layout.addWidget(header)
         
         # Content Layout
         content_layout = QHBoxLayout()
-        content_layout.setSpacing(0)
-        content_layout.setContentsMargins(10, 10, 10, 10)
+        content_layout.setSpacing(20)  
+        content_layout.setContentsMargins(20, 0, 20, 20)  
         
         # Linker Sidebar für verbundene Laufwerke
-        sidebar_widget = QWidget()
-        sidebar_widget.setFixedWidth(430)  
-        sidebar_widget.setStyleSheet("""
-            QWidget {
-                background-color: transparent;
-                border: 1px solid #4B5563;
-                border-radius: 4px;
-            }
-            QListWidget {
-                background-color: #2D2D2D;
-                border: none;
-            }
-        """)
-        sidebar_layout = QVBoxLayout(sidebar_widget)
-        sidebar_layout.setSpacing(5)
-        sidebar_layout.setContentsMargins(8, 8, 8, 8)
-        
-        drives_label = QLabel(" " + self.main_window.i18n.get("ui.connected_drives"))
-        drives_label.setStyleSheet("""
-            QLabel {
-                color: #E5E7EB;
-                font-weight: bold;
-                padding: 5px;
-            }
-        """)
-        sidebar_layout.addWidget(drives_label)
+        drives_widget = HeaderWidget("💾 " + self.main_window.i18n.get("ui.connected_drives"))
+        drives_widget.setFixedWidth(430)
+        drives_widget.setContentsMargins(0, 0, 0, 0)  # Entferne innere Margins
         
         # DriveList soll die gesamte verfügbare Höhe ausfüllen
         self.main_window.drives_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.main_window.drives_list.setMinimumHeight(400)  
-        sidebar_layout.addWidget(self.main_window.drives_list, stretch=1)  
+        self.main_window.drives_list.setMinimumHeight(400)
+        drives_widget.add_widget(self.main_window.drives_list)
         
-        # Füge Sidebar zum Content Layout hinzu
-        content_layout.addWidget(sidebar_widget, 1)
+        # Container für die linke Spalte
+        left_container = QWidget()
+        left_layout = QVBoxLayout(left_container)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
+        left_layout.addWidget(drives_widget)
+        
+        # Füge den Container zum Content Layout hinzu
+        content_layout.addWidget(left_container)
         
         # Rechter Bereich
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setSpacing(10)
+        right_layout.setContentsMargins(0, 0, 0, 0)  # Entferne innere Margins
+        right_layout.setSpacing(20)
         
         # Zeile 2: Zuordnungen und ausgeschlossene Laufwerke
         right_layout.addLayout(create_middle_layout(self.main_window))
@@ -93,65 +93,81 @@ class MainLayout:
         
         # Gefilterte Laufwerksliste (nur Instanz, nicht im Layout)
         self.main_window.filtered_drives_list = QListWidget()
-        self.main_window.filtered_drives_list.setMaximumHeight(250)  
+        self.main_window.filtered_drives_list.setMaximumHeight(250)
         
-        # Mittlerer Bereich mit Progress Widget und DropZone
+        # Transfer-Bereich mit Transfer-Widget und DropZone nebeneinander
+        transfer_section = QWidget()
+        transfer_layout = QHBoxLayout(transfer_section)
+        transfer_layout.setContentsMargins(0, 0, 0, 0)
+        transfer_layout.setSpacing(20)
+        
+        # Transfer-Widget (links)
+        transfer_container = QWidget()
+        transfer_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        transfer_container_layout = QVBoxLayout(transfer_container)
+        transfer_container_layout.setContentsMargins(0, 0, 0, 0)
+        transfer_container_layout.setSpacing(0)
+        
+        transfer_widget = HeaderWidget("📤 " + self.main_window.i18n.get("Aktive Transfers"))
+        transfer_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        transfer_widget.add_widget(self.main_window.transfer_widget)
+        transfer_container_layout.addWidget(transfer_widget)
+        
+        # DropZone (rechts)
+        dropzone_container = QWidget()
+        dropzone_container.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        dropzone_container.setFixedWidth(250)  # Feste Breite für die DropZone
+        dropzone_layout = QVBoxLayout(dropzone_container)
+        dropzone_layout.setContentsMargins(0, 0, 0, 0)
+        dropzone_layout.setSpacing(0)
+        
+        dropzone = DropZone(self.main_window)
+        dropzone.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        dropzone_layout.addWidget(dropzone)
+        
+        # Widgets zum Layout hinzufügen
+        transfer_layout.addWidget(transfer_container, stretch=1)
+        transfer_layout.addWidget(dropzone_container)
+        
+        # Transfer-Sektion zum rechten Layout hinzufügen
+        right_layout.addWidget(transfer_section)
+        
+        # Mittlerer Bereich mit Progress Widget und 
         middle_section = QWidget()
         middle_layout = QHBoxLayout(middle_section)
-        middle_layout.setContentsMargins(10, 10, 10, 10)
+        middle_layout.setContentsMargins(0, 0, 0, 0)
         middle_layout.setSpacing(10)
-        
-        # Progress Widget (80% Breite)
-        self.main_window.progress_widget = ProgressWidget(self.main_window)
-        self.main_window.progress_widget.setMinimumWidth(400)
-        self.main_window.progress_widget.setMinimumHeight(400)  
-        self.main_window.progress_widget.setStyleSheet("""
-            QWidget {
-                background-color: #2b2b2b;
-            }
-        """)
-        middle_layout.addWidget(self.main_window.progress_widget, stretch=8)
-        
-        # Drop-Zone (20% Breite)
-        self.main_window.drop_zone = DropZone(self.main_window)
-        self.main_window.drop_zone.setMinimumWidth(100)
-        middle_layout.addWidget(self.main_window.drop_zone, stretch=2)
         
         # Füge mittleren Bereich zum Layout hinzu
         right_layout.addWidget(middle_section)
         
-        # Splitter für Protocol und Settings
-        protocol_settings_splitter = QSplitter(Qt.Vertical)
-        protocol_settings_splitter.setContentsMargins(0, 0, 0, 0)
-        protocol_settings_splitter.setHandleWidth(1)
-        protocol_settings_splitter.setStyleSheet(
-            "QSplitter::handle { background-color: #2d5ca6; }"
-        )
+        # Protokoll und Einstellungen
+        bottom_layout = QHBoxLayout()
+        bottom_layout.setSpacing(20)  # Abstand zwischen den Widgets
         
-        # Protocol Group
-        protocol_group = QGroupBox("Protokoll")
-        protocol_layout = QVBoxLayout(protocol_group)
+        # Protokoll Widget
+        log_widget = HeaderWidget("📝 " + self.main_window.i18n.get("ui.protocol"))
         
-        # Erstelle das Log-Widget und verbinde es mit dem Logger
-        self.main_window.log_widget = QTextEditLogger(parent=protocol_group)
+        # Log Widget erstellen und konfigurieren
+        self.main_window.log_widget = QTextEditLogger(parent=self.main_window)
         self.main_window.log_widget.widget.setMinimumWidth(300)
         self.main_window.log_widget.setFormatter(
             logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         )
         logging.getLogger().addHandler(self.main_window.log_widget)
         logging.getLogger().setLevel(logging.INFO)
-        protocol_layout.addWidget(self.main_window.log_widget.widget)
         
-        # Einstellungen (Rechts)
-        settings_widget = create_settings_layout(self.main_window)
+        log_widget.add_widget(self.main_window.log_widget.widget)
+        bottom_layout.addWidget(log_widget)
         
-        # Füge beide zum Splitter hinzu (7:3 Verhältnis)
-        protocol_settings_splitter.addWidget(protocol_group)
-        protocol_settings_splitter.addWidget(settings_widget)
-        protocol_settings_splitter.setStretchFactor(0, 7)
-        protocol_settings_splitter.setStretchFactor(1, 3)
+        # Einstellungen Button
+        settings_widget = HeaderWidget("⚙️ " + self.main_window.i18n.get("Preset Manager"))
+        settings_content = create_settings_layout(self.main_window)
+        settings_widget.add_widget(settings_content)
+        bottom_layout.addWidget(settings_widget)
         
-        right_layout.addWidget(protocol_settings_splitter)
+        # Füge das Bottom Layout zum rechten Layout hinzu
+        right_layout.addLayout(bottom_layout)
         
         # Füge rechten Bereich zum Content Layout hinzu
         content_layout.addWidget(right_widget, 2)
@@ -168,6 +184,16 @@ class MainLayout:
         left_footer = QWidget()
         left_footer_layout = QHBoxLayout(left_footer)
         left_footer_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Theme Toggle Button
+        theme_toggle = ThemeToggleButton()
+        left_footer_layout.addWidget(theme_toggle)
+        
+        # Trennlinie nach Theme Toggle
+        separator_theme = QFrame()
+        separator_theme.setFrameShape(QFrame.VLine)
+        separator_theme.setFrameShadow(QFrame.Sunken)
+        left_footer_layout.addWidget(separator_theme)
         
         # Bereitschaftsanzeige
         self.main_window.ready_label = QLabel(" " + self.main_window.i18n.get("ui.ready"))
@@ -235,7 +261,12 @@ class MainLayout:
         
         main_layout.addLayout(footer_layout)
         
+        # Verbinde Theme-Änderungen
+        self.theme_manager.theme_changed.connect(
+            lambda theme: self.main_window.app.setStyleSheet(self.theme_manager.get_stylesheet())
+        )
+        
         # Setze Fenstergröße und Titel
-        self.main_window.setWindowTitle("Ingest Tool")
+        self.main_window.setWindowTitle("TheGeekFreaks - Ingest Tool")
         self.main_window.setMinimumSize(1024, 768)  
         self.main_window.resize(1280, 800)  

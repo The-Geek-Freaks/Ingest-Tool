@@ -1,15 +1,21 @@
 """
-Transfer-Module für die Verwaltung von Dateiübertragungen.
+Transfer-Modul für die Verwaltung von Dateiübertragungen.
 """
 
-from .metadata import MetadataManager
-from .analytics import TransferAnalytics
+from .manager import Manager
+from .transfer_coordinator import TransferCoordinator
 from .priority import TransferPriority
-from .manager import TransferManager
+from .exceptions import (
+    TransferError, DiskSpaceError, TransferCancelledError,
+    TransferTimeoutError
+)
 
 __all__ = [
-    'MetadataManager',
-    'TransferAnalytics', 
+    'Manager',
+    'TransferCoordinator',
     'TransferPriority',
-    'TransferManager'
+    'TransferError',
+    'DiskSpaceError',
+    'TransferCancelledError',
+    'TransferTimeoutError'
 ]

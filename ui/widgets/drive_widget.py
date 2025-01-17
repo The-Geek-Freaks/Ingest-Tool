@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (
 
 from core.drive.status import DriveStatus
 from utils.i18n import I18n
+from ui.style_helper import StyleHelper
 
 class DriveWidget(QWidget):
     """Widget zur Anzeige eines einzelnen Laufwerks."""
@@ -24,6 +25,7 @@ class DriveWidget(QWidget):
         self.i18n = i18n
         self.is_selected = False
         self.setup_ui()
+        self.setup_style()
         
     def setup_ui(self):
         """Richtet das UI des Widgets ein."""
@@ -34,17 +36,6 @@ class DriveWidget(QWidget):
         # Hauptframe
         frame = QFrame()
         frame.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
-        frame.setStyleSheet("""
-            QFrame {
-                background-color: #2d2d2d;
-                border: 1px solid #404040;
-                border-radius: 4px;
-            }
-            QFrame:hover {
-                background-color: #353535;
-                border: 1px solid #505050;
-            }
-        """)
         
         # Layout für Frame-Inhalt
         frame_layout = QVBoxLayout()
@@ -79,16 +70,6 @@ class DriveWidget(QWidget):
             eject_btn.setIcon(QIcon("assets/icons/eject.png"))
             eject_btn.setToolTip(self.i18n.get('drive.eject'))
             eject_btn.clicked.connect(self.eject.emit)
-            eject_btn.setStyleSheet("""
-                QPushButton {
-                    border: none;
-                    padding: 4px;
-                    border-radius: 2px;
-                }
-                QPushButton:hover {
-                    background-color: #404040;
-                }
-            """)
             top_row.addWidget(eject_btn)
             
         frame_layout.addLayout(top_row)
@@ -126,6 +107,54 @@ class DriveWidget(QWidget):
         
         # Mausklick-Events
         self.setMouseTracking(True)
+        
+    def setup_style(self):
+        """Wendet das einheitliche Styling an."""
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {StyleHelper.SURFACE};
+                color: {StyleHelper.TEXT};
+                border: 1px solid {StyleHelper.BORDER};
+                border-radius: 4px;
+            }}
+            
+            QProgressBar {{
+                border: 1px solid {StyleHelper.BORDER};
+                border-radius: 2px;
+                text-align: center;
+                background-color: {StyleHelper.BACKGROUND};
+                height: 12px;
+            }}
+            
+            QProgressBar::chunk {{
+                background-color: {StyleHelper.ACCENT};
+            }}
+            
+            QPushButton {{
+                background-color: {StyleHelper.SURFACE};
+                color: {StyleHelper.TEXT};
+                border: 1px solid {StyleHelper.BORDER};
+                border-radius: 3px;
+                padding: 5px;
+                min-width: 80px;
+            }}
+            
+            QPushButton:hover {{
+                background-color: {StyleHelper.SURFACE_LIGHT};
+                border-color: {StyleHelper.ACCENT};
+            }}
+            
+            QPushButton:pressed {{
+                background-color: {StyleHelper.ACCENT};
+                color: {StyleHelper.BACKGROUND};
+            }}
+            
+            QPushButton:disabled {{
+                background-color: {StyleHelper.SURFACE};
+                border-color: {StyleHelper.BORDER};
+                color: {StyleHelper.TEXT_SECONDARY};
+            }}
+        """)
         
     def update_status(self, status: str):
         """Aktualisiert den Status des Laufwerks."""
@@ -171,10 +200,13 @@ class DriveWidget(QWidget):
                 
             self.progress_bar.setStyleSheet(f"""
                 QProgressBar {{
-                    border: 1px solid #404040;
+                    border: 1px solid {StyleHelper.BORDER};
                     border-radius: 2px;
                     text-align: center;
+                    background-color: {StyleHelper.BACKGROUND};
+                    height: 12px;
                 }}
+                
                 QProgressBar::chunk {{
                     background-color: {color};
                 }}
@@ -200,15 +232,11 @@ class DriveWidget(QWidget):
     def update_selection_style(self):
         """Aktualisiert den Stil basierend auf Auswahl-Status."""
         if self.is_selected:
-            self.setStyleSheet("""
-                QFrame {
-                    background-color: #1a237e;
-                    border: 2px solid #303f9f;
-                }
-                QFrame:hover {
-                    background-color: #283593;
-                    border: 2px solid #3949ab;
-                }
+            self.setStyleSheet(f"""
+                QWidget {{
+                    background-color: {StyleHelper.SURFACE_DARK};
+                    border: 2px solid {StyleHelper.ACCENT};
+                }}
             """)
         else:
             self.setStyleSheet("")

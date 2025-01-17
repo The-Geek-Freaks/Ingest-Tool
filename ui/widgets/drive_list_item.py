@@ -6,19 +6,20 @@ from PyQt5.QtWidgets import (QListWidgetItem, QLabel, QWidget, QHBoxLayout,
                             QSizePolicy, QApplication)
 from PyQt5.QtCore import QTimer, Qt, QSize
 from PyQt5.QtGui import QIcon, QColor
+from PyQt5.Qt import QStyle
 
 logger = logging.getLogger(__name__)
 
 class DriveListItem(QListWidgetItem):
-    """Ein Listenelement für ein verbundenes Laufwerk."""
+    """Ein ListWidget-Item für ein Laufwerk."""
     
-    # Laufwerkstyp Icons (QStyle Standard Pixmaps)
+    # Icons für verschiedene Laufwerkstypen
     DRIVE_ICONS = {
-        "removable": QApplication.style().SP_DriveFDIcon,
-        "local": QApplication.style().SP_DriveHDIcon,
-        "remote": QApplication.style().SP_DriveNetIcon,
-        "cd": QApplication.style().SP_DriveCDIcon,
-        "unknown": QApplication.style().SP_DriveHDIcon
+        "fixed": QStyle.SP_DriveHDIcon,
+        "removable": QStyle.SP_DriveFDIcon,
+        "cdrom": QStyle.SP_DriveCDIcon,
+        "remote": QStyle.SP_DriveNetIcon,
+        "unknown": QStyle.SP_DriveHDIcon
     }
 
     # Status Icons
@@ -103,7 +104,7 @@ class DriveListItem(QListWidgetItem):
         
         # Icon Label
         self.icon_label = QLabel()
-        icon = QIcon(self.style.standardPixmap(self.DRIVE_ICONS[self.drive_type]))
+        icon = QIcon(self.style.standardPixmap(self.DRIVE_ICONS.get(self.drive_type, self.DRIVE_ICONS["unknown"])))
         pixmap = icon.pixmap(32, 32)
         self.icon_label.setPixmap(pixmap)
         self.icon_label.setFixedSize(32, 32)
@@ -113,7 +114,7 @@ class DriveListItem(QListWidgetItem):
         self.drive_container = QWidget()
         self.drive_container.setStyleSheet(f"""
             QWidget {{
-                background-color: {self.DRIVE_COLORS[self.drive_type]};
+                background-color: {self.DRIVE_COLORS.get(self.drive_type, self.DRIVE_COLORS["unknown"])};
                 border-radius: 4px;
                 padding: 4px 8px;
             }}

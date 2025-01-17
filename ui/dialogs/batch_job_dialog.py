@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                           QComboBox, QPushButton, QFileDialog, QLineEdit)
-from PyQt5.QtCore import Qt
+                           QComboBox, QPushButton, QFileDialog, QLineEdit, QTimeEdit)
+from PyQt5.QtCore import Qt, QTime
+from ui.style_helper import StyleHelper
 
 class BatchJobDialog(QDialog):
     """Dialog zum Hinzufügen eines neuen Batch-Jobs."""

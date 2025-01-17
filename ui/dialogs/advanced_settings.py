@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QTime
 
+from ui.style_helper import StyleHelper
 from ui.dialogs.batch_job_dialog import BatchJobDialog
 
 class AdvancedSettingsDialog(QDialog):

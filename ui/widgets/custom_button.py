@@ -4,6 +4,7 @@ Angepasster Button mit einheitlichem Styling.
 from PyQt5.QtWidgets import QPushButton, QSizePolicy, QToolTip
 from PyQt5.QtCore import Qt, QSize, QPropertyAnimation
 from PyQt5.QtGui import QFont
+from ui.style_helper import StyleHelper
 
 class CustomButton(QPushButton):
     """Ein angepasster Button mit einheitlichem Styling."""
@@ -22,38 +23,38 @@ class CustomButton(QPushButton):
         
     def setup_style(self):
         """Wendet das einheitliche Styling an."""
-        # Setze Tooltip
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {StyleHelper.SURFACE};
+                color: {StyleHelper.TEXT};
+                border: 1px solid {StyleHelper.BORDER};
+                border-radius: 3px;
+                padding: 5px 10px;
+                min-width: 80px;
+            }}
+            
+            QPushButton:hover {{
+                background-color: {StyleHelper.SURFACE_LIGHT};
+                border-color: {StyleHelper.ACCENT};
+            }}
+            
+            QPushButton:pressed {{
+                background-color: {StyleHelper.ACCENT};
+                color: {StyleHelper.BACKGROUND};
+            }}
+            
+            QPushButton:disabled {{
+                background-color: {StyleHelper.SURFACE};
+                border-color: {StyleHelper.BORDER};
+                color: {StyleHelper.TEXT_SECONDARY};
+            }}
+        """)
+        
+        # Weitere Einstellungen
+        self.setFont(QFont("Segoe UI", 9))
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.setMinimumSize(QSize(80, 30))
+        
         if self.tooltip:
             self.setToolTip(self.tooltip)
-            QToolTip.setFont(QFont('Segoe UI', 9))
-            
-        # Aktiviere Mouse Tracking für Hover-Effekte
-        self.setMouseTracking(True)
-        
-        # Größenpolicy
-        self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
-        
-        # Grundlegendes Styling
-        self.setStyleSheet("""
-            QPushButton {
-                background-color: #2d5ca6;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-size: 14px;
-            }
-            
-            QPushButton:hover {
-                background-color: #3670c9;
-            }
-            
-            QPushButton:pressed {
-                background-color: #1f4179;
-            }
-            
-            QPushButton:disabled {
-                background-color: #666666;
-            }
-        """)
-        self.setCursor(Qt.PointingHandCursor)
+            QToolTip.setFont(QFont("Segoe UI", 8))

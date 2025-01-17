@@ -209,7 +209,18 @@ class I18n:
                 "transfer_cancelled": "Übertragung abgebrochen",
                 "no_available_drives": "Keine verfügbaren Laufwerke",
                 "select_filetype_first": "Bitte wählen Sie zuerst einen Dateityp aus",
-                "cancel": "Abbrechen"
+                "cancel": "Abbrechen",
+                "protocol": "Protokoll",
+                "settings": "Einstellungen",
+                "connected_drives": "Verbundene Laufwerke",
+                "active_transfers": "Aktive Transfers",
+                "settings_delete_source": "Quelle löschen nach Transfer",
+                "settings_manage_presets": "Preset Manager",
+                "settings_manage_filetypes": "Erweiterte Dateitypen",
+                "settings_advanced": "Erweiterte Einstellungen",
+                "manage_presets": "Preset Manager",
+                "manage_filetypes": "Erweiterte Dateitypen",
+                "advanced": "Erweiterte Einstellungen"
             },
             "messages": {
                 "copy_started": "Kopiervorgang gestartet",
@@ -304,7 +315,18 @@ class I18n:
                 "transfer_cancelled": "Transfer cancelled",
                 "no_available_drives": "No available drives",
                 "select_filetype_first": "Please select a file type first",
-                "cancel": "Cancel"
+                "cancel": "Cancel",
+                "protocol": "Protocol",
+                "settings": "Settings",
+                "connected_drives": "Connected Drives",
+                "active_transfers": "Active Transfers",
+                "settings_delete_source": "Delete source after transfer",
+                "settings_manage_presets": "Preset Manager",
+                "settings_manage_filetypes": "Advanced File Types",
+                "settings_advanced": "Advanced Settings",
+                "manage_presets": "Preset Manager",
+                "manage_filetypes": "Advanced File Types",
+                "advanced": "Advanced Settings"
             },
             "messages": {
                 "copy_started": "Copy started",
