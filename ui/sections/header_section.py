@@ -48,7 +48,13 @@ class HeaderSection(QWidget):
         
         # Banner
         self.banner_label = QLabel(self)
-        self.banner_pixmap = QPixmap("C:/Users/Shadow-PC/CascadeProjects/Ingest-Tool/docs/assets/banner_groß.png")
+        self.banner_pixmap = QPixmap("docs/assets/banner_groß.png")
+        
+        # Prüfe, ob das Banner erfolgreich geladen wurde
+        if self.banner_pixmap.isNull():
+            # Fallback: Erstelle ein leeres Banner mit Standardgröße
+            self.banner_pixmap = QPixmap(800, 200)
+            self.banner_pixmap.fill(Qt.white)
         
         # Berechne die Höhe basierend auf dem Banner-Ratio
         banner_ratio = self.banner_pixmap.height() / self.banner_pixmap.width()

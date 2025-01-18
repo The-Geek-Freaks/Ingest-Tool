@@ -1,6 +1,6 @@
 {
     "mappings": {
-        ".mp4": "U:/ARCHIV"
+        "*.mp4": "U:/ARCHIV"
     },
     "excluded_drives": [
         "V",
