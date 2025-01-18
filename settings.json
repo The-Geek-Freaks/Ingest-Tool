@@ -1,4 +1,7 @@
 {
+    "mappings": {
+        ".mp4": "U:/ARCHIV"
+    },
     "excluded_drives": [
         "V",
         "Y",
@@ -17,14 +20,5 @@
         "L",
         "G",
         "R"
-    ],
-    "mappings": {
-        ".mp4": "U:/ARCHIV"
-    },
-    "parallel_copies": 2,
-    "buffer_size": 65536,
-    "auto_start": false,
-    "verify_copies": false,
-    "recursive_search": true,
-    "show_notifications": true
+    ]
 }

@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
     QPushButton, QTabWidget, QWidget, QComboBox,
     QCheckBox, QTimeEdit, QListWidget, QListWidgetItem,
-    QGroupBox, QLineEdit
+    QGroupBox, QLineEdit, QDesktopWidget
 )
 from PyQt5.QtCore import Qt, QTime, QDateTime
 from PyQt5.QtGui import QIcon
@@ -13,6 +13,7 @@ import os
 
 from ui.style_helper import StyleHelper
 from ui.dialogs.batch_job_dialog import BatchJobDialog
+from ui.widgets.plugin_manager import PluginManager
 
 class AdvancedSettingsDialog(QDialog):
     def __init__(self, parent=None, settings=None, drives=None, file_types=None):
@@ -22,11 +23,24 @@ class AdvancedSettingsDialog(QDialog):
         self.file_types = file_types or []
         self.batch_jobs = []
         self.setup_ui()
+        self.center_and_resize()
+        
+    def center_and_resize(self):
+        """Zentriert das Fenster und setzt die Größe."""
+        desktop = QDesktopWidget().availableGeometry()
+        width = int(desktop.width() * 0.7)  # 70% der Bildschirmbreite
+        height = int(desktop.height() * 0.8)  # 80% der Bildschirmhöhe
+        self.resize(width, height)
+        
+        # Zentriere das Fenster
+        frame_geometry = self.frameGeometry()
+        center_point = desktop.center()
+        frame_geometry.moveCenter(center_point)
+        self.move(frame_geometry.topLeft())
         
     def setup_ui(self):
         """Erstellt die UI-Elemente."""
         self.setWindowTitle("Erweiterte Einstellungen")
-        self.setMinimumWidth(500)
         layout = QVBoxLayout(self)
         
         # Tabs
@@ -36,6 +50,7 @@ class AdvancedSettingsDialog(QDialog):
         tab_widget.addTab(self.create_automation_tab(), "Automatisierung")
         tab_widget.addTab(self.create_logging_tab(), "Logging")
         tab_widget.addTab(self._create_rename_tab(), "Batch-Rename")
+        tab_widget.addTab(self.create_plugins_tab(), "Plugins")
         layout.addWidget(tab_widget)
         
         # Buttons
@@ -44,8 +59,49 @@ class AdvancedSettingsDialog(QDialog):
         cancel_button = QPushButton("Abbrechen")
         save_button.clicked.connect(self.accept)
         cancel_button.clicked.connect(self.reject)
-        button_layout.addWidget(save_button)
+        
+        # Styling für die Buttons
+        for button in [save_button, cancel_button]:
+            button.setMinimumWidth(120)
+            button.setMinimumHeight(32)
+        
+        save_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+            QPushButton:pressed {
+                background-color: #1565C0;
+            }
+        """)
+        
+        cancel_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f8f9fa;
+                color: #495057;
+                border: 1px solid #ced4da;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+            QPushButton:pressed {
+                background-color: #dee2e6;
+            }
+        """)
+        
+        button_layout.addStretch()
         button_layout.addWidget(cancel_button)
+        button_layout.addWidget(save_button)
         layout.addLayout(button_layout)
         
     def create_copy_tab(self):
@@ -544,3 +600,24 @@ class AdvancedSettingsDialog(QDialog):
             return True
             
         return False
+
+    def create_plugins_tab(self):
+        """Erstellt den Plugins-Tab."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Beschreibung
+        description = QLabel(
+            "Hier können Sie Plugins verwalten, die die Funktionalität des Tools erweitern. "
+            "Installieren Sie neue Plugins oder verwalten Sie bestehende."
+        )
+        description.setWordWrap(True)
+        description.setStyleSheet("color: #666; margin-bottom: 20px;")
+        layout.addWidget(description)
+        
+        # Plugin-Manager
+        plugin_manager = PluginManager()
+        layout.addWidget(plugin_manager)
+        
+        return tab

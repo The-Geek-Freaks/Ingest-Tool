@@ -7,7 +7,8 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QGroupBox,
     QPushButton, QLabel, QComboBox,
     QLineEdit, QCheckBox, QListWidget,
-    QWidget, QSplitter, QFrame, QSizePolicy
+    QWidget, QSplitter, QFrame, QSizePolicy,
+    QToolTip
 )
 from PyQt5.QtCore import Qt
 from datetime import datetime
@@ -27,6 +28,7 @@ from ui.widgets.theme_toggle_button import ThemeToggleButton
 from ui.theme_manager import ThemeManager
 from ui.sections.header_section import HeaderSection
 from PyQt5.QtGui import QFont
+from ui.widgets.faq_widget import FAQDialog
 
 class MainLayout:
     """Verwaltet das Layout des Hauptfensters."""
@@ -185,8 +187,9 @@ class MainLayout:
         left_footer_layout = QHBoxLayout(left_footer)
         left_footer_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Theme Toggle Button
+        # Theme Toggle Button mit Tooltip
         theme_toggle = ThemeToggleButton()
+        theme_toggle.setToolTip("Klicken Sie hier, um zwischen hellem und dunklem Design zu wechseln")
         left_footer_layout.addWidget(theme_toggle)
         
         # Trennlinie nach Theme Toggle
@@ -195,18 +198,21 @@ class MainLayout:
         separator_theme.setFrameShadow(QFrame.Sunken)
         left_footer_layout.addWidget(separator_theme)
         
-        # Bereitschaftsanzeige
+        # Bereitschaftsanzeige mit Tooltip
         self.main_window.ready_label = QLabel(" " + self.main_window.i18n.get("ui.ready"))
+        self.main_window.ready_label.setToolTip("Zeigt an, ob das Tool bereit ist, neue Transfers zu starten")
         left_footer_layout.addWidget(self.main_window.ready_label)
         
-        # Speicherplatz
+        # Speicherplatz mit Tooltip
         self.main_window.storage_label = QLabel()
         self.main_window.storage_label.setText(" " + self.main_window.i18n.get("ui.storage", free="0 GB", total="0 GB"))
+        self.main_window.storage_label.setToolTip("Zeigt den verfügbaren und gesamten Speicherplatz an")
         left_footer_layout.addWidget(self.main_window.storage_label)
         
-        # CPU-Auslastung
+        # CPU-Auslastung mit Tooltip
         self.main_window.cpu_label = QLabel()
         self.main_window.cpu_label.setText(" " + self.main_window.i18n.get("ui.cpu", usage="0"))
+        self.main_window.cpu_label.setToolTip("Zeigt die aktuelle CPU-Auslastung des Systems an")
         left_footer_layout.addWidget(self.main_window.cpu_label)
         
         # Trennlinie
@@ -215,10 +221,29 @@ class MainLayout:
         separator.setFrameShadow(QFrame.Sunken)
         left_footer_layout.addWidget(separator)
         
-        # Copyright
+        # FAQ Button
+        faq_button = QPushButton("❓ FAQ")
+        faq_button.setToolTip("Häufig gestellte Fragen und Antworten")
+        faq_button.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+                color: #666;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 0, 0, 0.1);
+                border-radius: 3px;
+            }
+        """)
+        faq_button.clicked.connect(self.show_faq)
+        left_footer_layout.addWidget(faq_button)
+        
+        # Copyright mit Tooltip
         year = datetime.now().year
-        copyright_label = QLabel("Copyright TheGeekFreaks | Alexander Zuber-Jatzke")
+        copyright_label = QLabel(f"Copyright TheGeekFreaks | Alexander Zuber-Jatzke")
         copyright_label.setStyleSheet("color: #666;")
+        copyright_label.setToolTip(f" TheGeekFreaks. Alle Rechte vorbehalten.")
         left_footer_layout.addWidget(copyright_label)
         
         footer_layout.addWidget(left_footer)
@@ -226,18 +251,21 @@ class MainLayout:
         # Füge maximalen Stretch hinzu um die Buttons nach ganz rechts zu schieben
         footer_layout.addStretch(1)
         
-        # Start und Stop Buttons in einem eigenen Widget
+        # Start und Stop Buttons in einem eigenen Widget mit Tooltips
         buttons_widget = QWidget()
         buttons_layout = QHBoxLayout(buttons_widget)
         buttons_layout.setContentsMargins(0, 0, 10, 0)  
         
-        # Start und Stop Buttons
+        # Start und Stop Buttons mit Tooltips
+        self.main_window.start_button.setToolTip("Startet die Überwachung der Laufwerke")
+        self.main_window.cancel_button.setToolTip("Stoppt die Überwachung der Laufwerke")
         buttons_layout.addWidget(self.main_window.start_button)
         buttons_layout.addWidget(self.main_window.cancel_button)
         
-        # Abort Button
+        # Abort Button mit Tooltip
         self.main_window.abort_button = QPushButton("Transfer abbrechen")
-        self.main_window.abort_button.setEnabled(False)  
+        self.main_window.abort_button.setEnabled(False)
+        self.main_window.abort_button.setToolTip("Bricht den aktuellen Transfer ab")
         self.main_window.abort_button.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;
@@ -270,3 +298,8 @@ class MainLayout:
         self.main_window.setWindowTitle("TheGeekFreaks - Ingest Tool")
         self.main_window.setMinimumSize(1024, 768)  
         self.main_window.resize(1280, 800)  
+
+    def show_faq(self):
+        """Zeigt das FAQ-Fenster an."""
+        faq_dialog = FAQDialog(self.main_window)
+        faq_dialog.exec_()
