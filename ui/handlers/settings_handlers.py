@@ -284,14 +284,31 @@ class SettingsHandlers:
     def show_advanced_settings(self):
         """Zeigt den Dialog für erweiterte Einstellungen."""
         try:
+            # Aktuelle Einstellungen sammeln
             settings = {
+                # Kopier-Einstellungen
                 "buffer_size": self.main_window.parallel_copier.buffer_size // 1024,  # Konvertiere zu KB
+                "chunk_size": self.main_window.parallel_copier.chunk_size // 1024,  # Konvertiere zu KB
                 "parallel_copies": self.main_window.parallel_copier.max_workers,
                 "verify_mode": self.main_window.settings.get('verify_mode', 'none'),
+                "retry_count": self.main_window.settings.get('retry_count', 3),
+                "retry_delay": self.main_window.settings.get('retry_delay', 1.0),
+                "timeout": self.main_window.settings.get('timeout', 30.0),
+                "preserve_timestamps": self.main_window.settings.get('preserve_timestamps', True),
+                "create_target_dirs": self.main_window.settings.get('create_target_dirs', True),
+                
+                # Automatisierungs-Einstellungen
                 "auto_start": self.main_window.settings.get('auto_start', False),
                 "schedule_enable": self.main_window.settings.get('schedule_enable', False),
                 "start_time": self.main_window.settings.get('start_time', '22:00'),
-                "batch_jobs": self.main_window.batch_manager.jobs if hasattr(self.main_window.batch_manager, 'jobs') else []
+                "batch_jobs": self.main_window.batch_manager.jobs if hasattr(self.main_window.batch_manager, 'jobs') else [],
+                
+                # Überwachungs-Einstellungen
+                "poll_interval": self.main_window.settings.get('poll_interval', 5),
+                "monitored_file_types": self.main_window.settings.get('monitored_file_types', [".mp4", ".mov", ".avi"]),
+                "recursive_monitoring": self.main_window.settings.get('recursive_monitoring', True),
+                "monitor_hidden_files": self.main_window.settings.get('monitor_hidden_files', False),
+                "monitor_system_files": self.main_window.settings.get('monitor_system_files', False)
             }
             
             dialog = AdvancedSettingsDialog(
@@ -306,23 +323,123 @@ class SettingsHandlers:
                 
                 # Aktualisiere Kopiereinstellungen
                 self.main_window.parallel_copier.buffer_size = new_settings["buffer_size"] * 1024
+                self.main_window.parallel_copier.chunk_size = new_settings["chunk_size"] * 1024
                 self.main_window.parallel_copier.max_workers = new_settings["parallel_copies"]
                 
-                # Speichere Batch-Jobs
-                if hasattr(self.main_window.batch_manager, 'jobs'):
-                    self.main_window.batch_manager.jobs = []
-                    for job in new_settings["batch_jobs"]:
-                        self.main_window.batch_manager.add_job(
-                            job["source_drive"],
-                            job["file_type"],
-                            job["target_path"]
-                        )
+                # Aktualisiere Fehlerbehandlung
+                self.main_window.parallel_copier.retry_count = new_settings["retry_count"]
+                self.main_window.parallel_copier.retry_delay = new_settings["retry_delay"]
+                self.main_window.parallel_copier.timeout = new_settings["timeout"]
+                
+                # Aktualisiere Verzeichniseinstellungen
+                self.main_window.parallel_copier.preserve_timestamps = new_settings["preserve_timestamps"]
+                self.main_window.parallel_copier.create_target_dirs = new_settings["create_target_dirs"]
+                
+                # Aktualisiere Überwachungseinstellungen
+                if hasattr(self.main_window, 'file_watcher_manager'):
+                    self.main_window.file_watcher_manager.poll_interval = new_settings["poll_interval"]
+                    self.main_window.file_watcher_manager.monitored_types = new_settings["monitored_file_types"]
+                    self.main_window.file_watcher_manager.recursive = new_settings["recursive_monitoring"]
+                    self.main_window.file_watcher_manager.monitor_hidden = new_settings["monitor_hidden_files"]
+                    self.main_window.file_watcher_manager.monitor_system = new_settings["monitor_system_files"]
                     
-                # Aktiviere/Deaktiviere Zeitsteuerung
-                if new_settings["schedule_enable"]:
-                    self.main_window.setup_scheduled_transfer(new_settings["start_time"])
-                else:
-                    self.main_window.disable_scheduled_transfer()
-                    
+                    # Starte FileWatcher neu mit neuen Einstellungen
+                    self.main_window.file_watcher_manager.restart()
+                
+                # Speichere alle Einstellungen
+                self.main_window.settings.update({
+                    'verify_mode': new_settings["verify_mode"],
+                    'auto_start': new_settings["auto_start"],
+                    'schedule_enable': new_settings["schedule_enable"],
+                    'start_time': new_settings["start_time"],
+                    'retry_count': new_settings["retry_count"],
+                    'retry_delay': new_settings["retry_delay"],
+                    'timeout': new_settings["timeout"],
+                    'preserve_timestamps': new_settings["preserve_timestamps"],
+                    'create_target_dirs': new_settings["create_target_dirs"],
+                    'poll_interval': new_settings["poll_interval"],
+                    'monitored_file_types': new_settings["monitored_file_types"],
+                    'recursive_monitoring': new_settings["recursive_monitoring"],
+                    'monitor_hidden_files': new_settings["monitor_hidden_files"],
+                    'monitor_system_files': new_settings["monitor_system_files"]
+                })
+                
+                # Aktualisiere Batch-Jobs
+                if hasattr(self.main_window, 'batch_manager'):
+                    self.main_window.batch_manager.jobs = new_settings["batch_jobs"]
+                
+                # Speichere Einstellungen in Datei
+                self.main_window.settings_manager.save_settings()
+                
         except Exception as e:
-            logger.error(f"Fehler beim Öffnen der erweiterten Einstellungen: {e}")
+            self.main_window.logger.error(f"Fehler beim Anwenden der erweiterten Einstellungen: {e}", exc_info=True)
+
+    def _apply_logging_settings(self, dialog):
+        """Wendet die Logging-Einstellungen an."""
+        try:
+            # Hole Referenz zum Protokoll-Widget
+            log_widget = self.main_window.log_section.log_text
+            
+            # Setze Log-Level Filter
+            log_widget.visible_levels = set()
+            if dialog.show_debug.isChecked():
+                log_widget.visible_levels.add(logging.DEBUG)
+            if dialog.show_info.isChecked():
+                log_widget.visible_levels.add(logging.INFO)
+            if dialog.show_warning.isChecked():
+                log_widget.visible_levels.add(logging.WARNING)
+            if dialog.show_error.isChecked():
+                log_widget.visible_levels.add(logging.ERROR)
+                
+            # Setze Anzeigeoptionen
+            log_widget.max_entries = dialog.max_entries.value()
+            log_widget.date_format = dialog.timestamp_format.currentText()
+            log_widget.auto_scroll = dialog.auto_scroll.isChecked()
+            log_widget.group_messages = dialog.group_messages.isChecked()
+            log_widget.show_line_numbers = dialog.show_line_numbers.isChecked()
+            
+            # Aktualisiere die Anzeige
+            log_widget.refresh_display()
+            
+            # Speichere Einstellungen
+            settings = self.main_window.settings_manager
+            settings.set('logging.levels.debug', dialog.show_debug.isChecked())
+            settings.set('logging.levels.info', dialog.show_info.isChecked())
+            settings.set('logging.levels.warning', dialog.show_warning.isChecked())
+            settings.set('logging.levels.error', dialog.show_error.isChecked())
+            settings.set('logging.max_entries', dialog.max_entries.value())
+            settings.set('logging.timestamp_format', dialog.timestamp_format.currentText())
+            settings.set('logging.auto_scroll', dialog.auto_scroll.isChecked())
+            settings.set('logging.group_messages', dialog.group_messages.isChecked())
+            settings.set('logging.show_line_numbers', dialog.show_line_numbers.isChecked())
+            
+            self.main_window.logger.info("Protokollierungseinstellungen aktualisiert")
+            
+        except Exception as e:
+            self.main_window.logger.error(f"Fehler beim Anwenden der Protokollierungseinstellungen: {e}")
+            
+    def _load_logging_settings(self, dialog):
+        """Lädt die Logging-Einstellungen in den Dialog."""
+        try:
+            settings = self.main_window.settings_manager
+            
+            # Lade Log-Level Einstellungen
+            dialog.show_debug.setChecked(settings.get('logging.levels.debug', False))
+            dialog.show_info.setChecked(settings.get('logging.levels.info', True))
+            dialog.show_warning.setChecked(settings.get('logging.levels.warning', True))
+            dialog.show_error.setChecked(settings.get('logging.levels.error', True))
+            
+            # Lade Anzeigeoptionen
+            dialog.max_entries.setValue(settings.get('logging.max_entries', 1000))
+            
+            timestamp_format = settings.get('logging.timestamp_format', 'HH:mm:ss')
+            index = dialog.timestamp_format.findText(timestamp_format)
+            if index >= 0:
+                dialog.timestamp_format.setCurrentIndex(index)
+                
+            dialog.auto_scroll.setChecked(settings.get('logging.auto_scroll', True))
+            dialog.group_messages.setChecked(settings.get('logging.group_messages', False))
+            dialog.show_line_numbers.setChecked(settings.get('logging.show_line_numbers', False))
+            
+        except Exception as e:
+            self.main_window.logger.error(f"Fehler beim Laden der Protokollierungseinstellungen: {e}")

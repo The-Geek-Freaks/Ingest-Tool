@@ -9,6 +9,7 @@ import os
 import logging
 from typing import Dict, Optional
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
+from PyQt5.QtCore import Qt
 
 logger = logging.getLogger(__name__)
 
@@ -104,12 +105,34 @@ class UIHandlers:
     def on_exclude_all_clicked(self):
         """Schließt alle verfügbaren Laufwerke aus."""
         try:
-            for drive_letter in self.main_window.drive_items.keys():
-                if not self.main_window.excluded_list.findItems(drive_letter, Qt.MatchExactly):
-                    self.main_window.excluded_list.addItem(drive_letter)
+            # Hole alle Laufwerksbuchstaben aus der Liste
+            drive_letters = self.main_window.drive_list.get_drive_letters()
+            logger.debug(f"Laufwerke zum Ausschließen: {drive_letters}")
+            
+            # Prüfe aktuelle Ausschlussliste
+            current_excluded = [
+                self.main_window.excluded_list.item(i).text()
+                for i in range(self.main_window.excluded_list.count())
+            ]
+            logger.debug(f"Bereits ausgeschlossene Laufwerke: {current_excluded}")
+            
+            # Füge jedes Laufwerk zur Ausschlussliste hinzu, wenn es noch nicht drin ist
+            for drive_letter in drive_letters:
+                # Formatiere den Laufwerksbuchstaben mit Doppelpunkt
+                formatted_drive = f"{drive_letter}:"
+                
+                # Prüfe den Status des Laufwerks
+                drive_status = self.main_window.drive_list.get_drive_status(drive_letter)
+                logger.debug(f"Status für Laufwerk {formatted_drive}: {drive_status}")
+                
+                if not self.main_window.excluded_list.findItems(formatted_drive, Qt.MatchExactly):
+                    self.main_window.excluded_list.addItem(formatted_drive)
+                    logger.debug(f"Laufwerk {formatted_drive} zur Ausschlussliste hinzugefügt")
+                else:
+                    logger.debug(f"Laufwerk {formatted_drive} bereits in Ausschlussliste")
                     
         except Exception as e:
-            logger.error(f"Fehler beim Ausschließen aller Laufwerke: {e}")
+            logger.error(f"Fehler beim Ausschließen aller Laufwerke: {e}", exc_info=True)
             
     def show_warning(self, title: str, message: str):
         """Zeigt eine Warnung an."""

@@ -73,6 +73,7 @@ class ModernTransferWidget(QWidget):
         # Initialisiere Datenstrukturen
         self._transfer_items = {}  # Dict[str, QListWidgetItem]
         self._last_update_times = {}  # Für Update-Debouncing
+        self._transfers = {}  # Für Transfer-Daten
         
         # Verbinde interne Signale
         self._update_transfer_signal.connect(

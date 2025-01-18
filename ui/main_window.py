@@ -2079,3 +2079,118 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Fehler beim Verbinden der Signale: {e}", exc_info=True)
             raise  # Re-raise the exception after logging
+def __init__(self, app):
+    super().__init__()
+    
+    # Speichere die App-Referenz
+    self.app = app
+    
+    # Setze das Programm-Icon
+    self.setWindowIcon(QIcon("ressourcen/icon.png"))
+    
+    # Initialisiere den Logger
+    self.logger = logging.getLogger(__name__)
+    self.logger.setLevel(logging.DEBUG)
+    
+    # Theme Manager initialisieren
+    self.theme_manager = ThemeManager()
+    self.app.setStyleSheet(self.theme_manager.get_stylesheet())
+    
+    # Setze initiale Fenstergröße
+    self.resize(1440, 1000)
+    self.setMinimumSize(1200, 1000)
+    
+    # Flag für erstes Anzeigen
+    self._first_show = True
+    
+    # Initialisiere Attribute
+    self.drive_items = {}
+    self.is_watching = False
+    self.excluded_drives = []
+    self.active_copies = {}
+    self.transfers = {}
+    
+    # Manager und Controller initialisieren
+    self._init_managers()
+    
+    # UI-Elemente initialisieren
+    self._init_ui_elements()
+    
+    # Signale verbinden
+    self._connect_signals()
+    
+    # Auto-Save Timer mit längerem Intervall
+    self.auto_save_timer = QTimer()
+    self.auto_save_timer.timeout.connect(self.save_current_state)
+    self.auto_save_timer.start(300000)  # Alle 5 Minuten statt jede Minute
+    
+    # Lade gespeicherte Einstellungen
+    self._load_settings()
+    
+    # Starte Laufwerksüberwachung
+    self.drive_controller.start_monitoring()
+    
+    self._shutdown_thread = None
+    self._is_shutting_down = False
+    
+    self.logger.debug("MainWindow initialisiert")
+
+def _init_ui_elements(self):
+    """Initialisiert UI-Elemente."""
+    # UI-Elemente hier initialisieren...
+    pass
+
+def _init_managers(self):
+    """Initialisiert Manager und Controller."""
+    # Initialisiere Settings Manager
+    self.settings_manager = SettingsManager()
+    self.settings = self.settings_manager.load_settings()
+    self.i18n = I18n(TRANSLATIONS_VERZEICHNIS)
+    
+    # Initialisiere Handler
+    self.ui_handlers = UIHandlers(self)
+    self.transfer_handlers = TransferHandlers(self)
+    self.settings_handlers = SettingsHandlers(self)
+    self.drive_handlers = DriveHandlers(self)
+    self.event_handlers = EventHandlers(self)
+    self.drive_event_handlers = DriveEventHandlers(self)
+    self.transfer_event_handlers = TransferEventHandlers(self)
+    
+    # Initialisiere TransferCoordinator mit optimierten Settings
+    self.transfer_settings = {
+        'max_workers': 2,  # Reduziert von 4
+        'chunk_size': 65536,  # Erhöht von 8192
+        'buffer_size': 262144,  # Erhöht von 65536
+        'retry_count': 3,
+        'retry_delay': 1.0,
+        'timeout': 30.0
+    }
+    self.transfer_coordinator = TransferCoordinator(self.transfer_settings)
+    
+    # Initialisiere FileWatcherManager
+    self.file_watcher_manager = FileWatcherManager(self)
+    
+    # Initialisiere DriveController
+    self.drive_controller = DriveController()
+
+def _connect_signals(self):
+    """Verbindet alle Signale."""
+    # Verbinde Drive-Controller Signale mit Qt.QueuedConnection
+    self.drive_controller.drive_connected.connect(
+        self.drive_event_handlers.on_drive_connected,
+        Qt.QueuedConnection
+    )
+    self.drive_controller.drive_disconnected.connect(
+        self.drive_event_handlers.on_drive_disconnected,
+        Qt.QueuedConnection
+    )
+    self.drive_controller.file_found.connect(
+        self.drive_event_handlers.on_file_found,
+        Qt.QueuedConnection
+    )
+    
+    # Verbinde FileWatcherManager Signale
+    self.file_watcher_manager.file_found.connect(
+        self._handle_file_found,
+        Qt.QueuedConnection
+    )

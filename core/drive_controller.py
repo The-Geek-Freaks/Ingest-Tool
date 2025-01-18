@@ -115,11 +115,6 @@ class DriveController(QThread):
             return self.known_drives[drive]
             
         try:
-            # Spezialfall: F: ist ein USB-Laufwerk
-            if drive.upper().startswith("F:"):
-                self.known_drives[drive] = "removable"
-                return "removable"
-                
             # Importiere win32file nur wenn nötig
             try:
                 import win32file
@@ -132,13 +127,24 @@ class DriveController(QThread):
                 drive_type = win32file.GetDriveType(drive + "\\")
                 
                 # Bestimme den Laufwerkstyp
+                # DRIVE_REMOVABLE (2): USB-Laufwerke, externe Festplatten
+                # DRIVE_CDROM (5): CD/DVD Laufwerke
+                # DRIVE_FIXED (3): Interne Festplatten
+                # DRIVE_REMOTE (4): Netzlaufwerke
+                # DRIVE_RAMDISK (6): RAM-Disk
+                # DRIVE_UNKNOWN (0): Unbekannt
+                # DRIVE_NO_ROOT_DIR (1): Ungültiger Pfad
                 if drive_type in [win32file.DRIVE_REMOVABLE, win32file.DRIVE_CDROM]:
                     result = "removable"
                 elif drive_type == win32file.DRIVE_REMOTE:
                     result = "remote"
+                elif drive_type == win32file.DRIVE_RAMDISK:
+                    result = "removable"  # RAM-Disks als Wechseldatenträger behandeln
                 else:
                     result = "local"
                     
+                self.logger.debug(f"Laufwerk {drive} hat Windows-Typ {drive_type}, kategorisiert als {result}")
+                
                 # Speichere den Typ für zukünftige Abfragen
                 self.known_drives[drive] = result
                 return result
@@ -162,6 +168,10 @@ class DriveController(QThread):
             drives = [d.rstrip("\\") for d in drives.split("\000") if d]
             current_drives = set(drives)
             
+            self.logger.debug(f"Gefundene Laufwerke: {current_drives}")
+            self.logger.debug(f"Bekannte Laufwerke: {self.known_drives}")
+            self.logger.debug(f"Ausgeschlossene Laufwerke: {self.excluded_drives}")
+            
             # Entferne nicht mehr vorhandene Laufwerke
             for drive in list(self.known_drives.keys()):
                 if drive not in current_drives or drive in self.excluded_drives:
@@ -175,6 +185,7 @@ class DriveController(QThread):
                     try:
                         # Prüfe ob das Laufwerk wirklich verfügbar ist
                         if not os.path.exists(drive):
+                            self.logger.debug(f"Laufwerk {drive} existiert nicht")
                             continue
                             
                         # Hole den Laufwerksnamen
@@ -182,6 +193,8 @@ class DriveController(QThread):
                         
                         # Ermittle den Laufwerkstyp
                         drive_type = self._get_drive_type(drive)
+                        
+                        self.logger.debug(f"Laufwerk {drive} - Name: {drive_name}, Typ: {drive_type}")
                         
                         # Speichere das Laufwerk
                         self.known_drives[drive] = drive_type
@@ -191,7 +204,7 @@ class DriveController(QThread):
                         self.logger.info(f"Neues Laufwerk gefunden: {drive} ({drive_name}) - Typ: {drive_type}")
                         
                     except Exception as e:
-                        self.logger.debug(f"Konnte Laufwerksinformationen für {drive} nicht abrufen: {e}")
+                        self.logger.error(f"Konnte Laufwerksinformationen für {drive} nicht abrufen: {e}", exc_info=True)
                         
         except Exception as e:
-            self.logger.error(f"Fehler beim Überprüfen der Laufwerke: {e}")
+            self.logger.error(f"Fehler beim Überprüfen der Laufwerke: {e}", exc_info=True)

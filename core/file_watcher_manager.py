@@ -111,182 +111,60 @@ class FileWatcherManager(QObject):
         if self.main_window:
             self.main_window.is_watching = value
 
-    def _get_excluded_drives(self) -> List[str]:
-        """Holt die Liste der ausgeschlossenen Laufwerke aus der UI."""
-        excluded = []
-        try:
-            if not self.main_window or not hasattr(self.main_window, 'excluded_list'):
-                return excluded
-                
-            for i in range(self.main_window.excluded_list.count()):
-                item = self.main_window.excluded_list.item(i)
-                if item and item.text():
-                    # Extrahiere Laufwerksbuchstaben (erstes Zeichen)
-                    drive = item.text().split()[0].strip().rstrip(':').upper()
-                    if drive:
-                        excluded.append(drive)
-                        
-            self.logger.debug(f"Ausgeschlossene Laufwerke: {excluded}")
-            
-        except Exception as e:
-            self.logger.error(f"Fehler beim Lesen der ausgeschlossenen Laufwerke: {e}")
-            
-        return excluded
-
-    def set_excluded_drives(self, drives: List[str]):
-        """Setzt die Liste der ausgeschlossenen Laufwerke."""
-        try:
-            self._excluded_drives = set(drives)
-            self.logger.info(f"Ausgeschlossene Laufwerke aktualisiert: {self._excluded_drives}")
-            
-            # Stoppe Watcher für ausgeschlossene Laufwerke
-            for drive in list(self._watchers.keys()):
-                if drive in self._excluded_drives:
-                    self.stop_watcher(drive)
-                    
-        except Exception as e:
-            self.logger.error(f"Fehler beim Setzen der ausgeschlossenen Laufwerke: {e}")
-
+    def restart(self):
+        """Startet die Überwachung mit aktualisierten Einstellungen neu."""
+        self.stop()
+        self.start()
+        
     def start(self):
-        """Startet die Dateiüberwachung."""
+        """Startet die Überwachung aller konfigurierten Laufwerke."""
         try:
-            if self._is_watching:
-                return
-                
-            self.logger.info("Starte Datenträgerüberwachung")
-            self.update_file_mappings()
-            
-            # Hole verfügbare und nicht ausgeschlossene Laufwerke
-            available_drives = []
-            if self.main_window:
-                # Hole alle verfügbaren Laufwerke
-                all_drives = self.main_window.drives_list.get_drive_letters()
-                # Hole ausgeschlossene Laufwerke
-                excluded_drives = self._get_excluded_drives()
-                # Filtere ausgeschlossene Laufwerke
-                available_drives = [d for d in all_drives if d.upper() not in excluded_drives]
-                self.logger.info(f"Verfügbare Laufwerke: {available_drives}")
-                self.logger.info(f"Ausgeschlossene Laufwerke: {excluded_drives}")
-            
-            # Starte Überwachung für jedes nicht ausgeschlossene Laufwerk
-            for drive in available_drives:
-                self.start_watching_drive(drive)
-            
-            self._is_watching = True
+            for drive in self.main_window.drive_list.get_drive_letters():
+                if not drive in self._watchers:
+                    self._create_watcher(drive)
+                    
+            self.logger.info("FileWatcherManager gestartet")
             
         except Exception as e:
-            self.logger.error(f"Fehler beim Starten der Überwachung: {e}")
-
-    def start_watching_drive(self, drive_letter: str):
-        """Startet die Überwachung für ein bestimmtes Laufwerk."""
+            self.logger.error(f"Fehler beim Starten des FileWatcherManager: {e}", exc_info=True)
+            
+    def stop(self):
+        """Stoppt die Überwachung aller Laufwerke."""
         try:
-            if not drive_letter or drive_letter in self._watchers:
-                return
-                
-            # Erstelle Pfad
-            drive_path = f"{drive_letter}:\\"
+            for watcher in self._watchers.values():
+                watcher.stop()
+            self._watchers.clear()
+            self.logger.info("FileWatcherManager gestoppt")
             
-            # Hole aktuelle Dateitypen aus den Zuordnungen
-            file_types = list(self._mappings.keys())
-            if not file_types:
-                self.logger.warning(f"Keine Dateitypen konfiguriert für {drive_path}")
-                return
-                
-            # Erstelle und starte Watcher
-            watcher = SignalFileWatcher(drive_path, file_types)
+        except Exception as e:
+            self.logger.error(f"Fehler beim Stoppen des FileWatcherManager: {e}", exc_info=True)
             
-            # Verbinde Signal direkt mit unserem Handler
+    def _create_watcher(self, drive: str):
+        """Erstellt einen FileWatcher für ein Laufwerk.
+        
+        Args:
+            drive: Laufwerksbuchstabe (z.B. "C:")
+        """
+        try:
+            watcher = SignalFileWatcher(
+                path=drive,
+                file_types=list(self._mappings.keys()),
+                poll_interval=5.0
+            )
+            
+            # Registriere Callback für gefundene Dateien
             watcher.file_found.connect(self._handle_new_file)
             
             # Starte Überwachung
             watcher.start()
             
             # Speichere Watcher
-            self._watchers[drive_letter] = watcher
-            self.logger.info(f"Überwachung von {drive_path} gestartet")
+            self._watchers[drive] = watcher
+            self.logger.debug(f"FileWatcher für Laufwerk {drive} erstellt")
             
         except Exception as e:
-            self.logger.error(f"Fehler beim Starten der Überwachung für {drive_letter}: {str(e)}", exc_info=True)
-
-    def stop_watcher(self, drive_letter: str):
-        """Stoppt den Watcher für das angegebene Laufwerk."""
-        try:
-            if drive_letter in self._watchers:
-                watcher = self._watchers[drive_letter]
-                watcher.stop()
-                del self._watchers[drive_letter]
-                self.logger.info(f"Watcher für Laufwerk {drive_letter} gestoppt")
-                
-        except Exception as e:
-            self.logger.error(f"Fehler beim Stoppen des Watchers für {drive_letter}: {e}")
-
-    def stop(self):
-        """Stoppt die Dateiüberwachung."""
-        try:
-            if not self._is_watching:
-                return
-                
-            self.logger.info("Stoppe Datenträgerüberwachung")
+            self.logger.error(f"Fehler beim Erstellen des FileWatcher für {drive}: {e}", exc_info=True)
             
-            # Stoppe alle Watcher
-            for drive, watcher in self._watchers.items():
-                try:
-                    watcher.stop()
-                    self.logger.info(f"Überwachung von {drive}:\\ gestoppt")
-                except Exception as e:
-                    self.logger.error(f"Fehler beim Stoppen des Watchers für {drive}: {e}")
-            
-            # Stoppe auch den Transfer Manager
-            if hasattr(self, 'transfer_coordinator'):
-                self.transfer_coordinator.abort_transfers()
-            
-            self._watchers.clear()
-            self._is_watching = False
-            
-            # Lösche verarbeitete Dateien und setze Transfer-Status zurück
-            with self._processed_files_lock:
-                self._processed_files.clear()
-                self._transfer_in_progress = False
-            
-            self.logger.info("Datenträgerüberwachung gestoppt")
-            
-        except Exception as e:
-            self.logger.error(f"Fehler beim Stoppen der Überwachung: {e}")
-
-    def update_file_mappings(self):
-        """Aktualisiert die Zuordnungen zwischen Dateitypen und Zielverzeichnissen."""
-        try:
-            self._mappings.clear()
-            if not self.main_window:
-                return
-                
-            # Hole Zuordnungen aus der UI
-            for i in range(self.main_window.mappings_list.count()):
-                item = self.main_window.mappings_list.item(i)
-                if item and item.text():
-                    text = item.text()
-                    if "➔" in text:
-                        file_type, target = text.split("➔")
-                        file_type = file_type.strip()  # z.B. "*.mp4"
-                        target = target.strip()
-                        
-                        # Entferne * und füge . hinzu wenn nötig
-                        clean_type = file_type.replace('*', '')
-                        if not clean_type.startswith('.'):
-                            clean_type = '.' + clean_type
-                            
-                        # Normalisiere den Zielpfad
-                        target_path = os.path.abspath(target)
-                        
-                        # Füge die Zuordnung hinzu
-                        self._mappings[clean_type.lower()] = target_path
-                        self.logger.info(f"Zuordnung hinzugefügt: {clean_type} -> {target_path}")
-                        
-            self.logger.debug(f"Aktualisierte Zuordnungen: {self._mappings}")
-            
-        except Exception as e:
-            self.logger.error(f"Fehler beim Aktualisieren der Zuordnungen: {str(e)}", exc_info=True)
-
     def _handle_new_file(self, file_path: str):
         """Verarbeitet eine neue Datei."""
         try:
@@ -380,6 +258,88 @@ class FileWatcherManager(QObject):
         except Exception as e:
             self.logger.error(f"Fehler beim Starten des Watchers: {str(e)}")
             return False
+
+    def stop_watcher(self, drive_letter: str):
+        """Stoppt den Watcher für das angegebene Laufwerk."""
+        try:
+            if drive_letter in self._watchers:
+                watcher = self._watchers[drive_letter]
+                watcher.stop()
+                del self._watchers[drive_letter]
+                self.logger.info(f"Watcher für Laufwerk {drive_letter} gestoppt")
+                
+        except Exception as e:
+            self.logger.error(f"Fehler beim Stoppen des Watchers für {drive_letter}: {e}")
+
+    def update_file_mappings(self):
+        """Aktualisiert die Zuordnungen zwischen Dateitypen und Zielverzeichnissen."""
+        try:
+            self._mappings.clear()
+            if not self.main_window:
+                return
+                
+            # Hole Zuordnungen aus der UI
+            for i in range(self.main_window.mappings_list.count()):
+                item = self.main_window.mappings_list.item(i)
+                if item and item.text():
+                    text = item.text()
+                    if "➔" in text:
+                        file_type, target = text.split("➔")
+                        file_type = file_type.strip()  # z.B. "*.mp4"
+                        target = target.strip()
+                        
+                        # Entferne * und füge . hinzu wenn nötig
+                        clean_type = file_type.replace('*', '')
+                        if not clean_type.startswith('.'):
+                            clean_type = '.' + clean_type
+                            
+                        # Normalisiere den Zielpfad
+                        target_path = os.path.abspath(target)
+                        
+                        # Füge die Zuordnung hinzu
+                        self._mappings[clean_type.lower()] = target_path
+                        self.logger.info(f"Zuordnung hinzugefügt: {clean_type} -> {target_path}")
+                        
+            self.logger.debug(f"Aktualisierte Zuordnungen: {self._mappings}")
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Aktualisieren der Zuordnungen: {str(e)}", exc_info=True)
+
+    def _get_excluded_drives(self) -> List[str]:
+        """Holt die Liste der ausgeschlossenen Laufwerke aus der UI."""
+        excluded = []
+        try:
+            if not self.main_window or not hasattr(self.main_window, 'excluded_list'):
+                return excluded
+                
+            for i in range(self.main_window.excluded_list.count()):
+                item = self.main_window.excluded_list.item(i)
+                if item and item.text():
+                    # Extrahiere Laufwerksbuchstaben (erstes Zeichen)
+                    drive = item.text().split()[0].strip().rstrip(':').upper()
+                    if drive:
+                        excluded.append(drive)
+                        
+            self.logger.debug(f"Ausgeschlossene Laufwerke: {excluded}")
+            
+        except Exception as e:
+            self.logger.error(f"Fehler beim Lesen der ausgeschlossenen Laufwerke: {e}")
+            
+        return excluded
+
+    def set_excluded_drives(self, drives: List[str]):
+        """Setzt die Liste der ausgeschlossenen Laufwerke."""
+        try:
+            self._excluded_drives = set(drives)
+            self.logger.info(f"Ausgeschlossene Laufwerke aktualisiert: {self._excluded_drives}")
+            
+            # Stoppe Watcher für ausgeschlossene Laufwerke
+            for drive in list(self._watchers.keys()):
+                if drive in self._excluded_drives:
+                    self.stop_watcher(drive)
+                    
+        except Exception as e:
+            self.logger.error(f"Fehler beim Setzen der ausgeschlossenen Laufwerke: {e}")
 
     def abort_transfers(self):
         """Bricht alle laufenden Transfers ab."""

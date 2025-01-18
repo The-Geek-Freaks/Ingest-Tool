@@ -90,7 +90,19 @@ class DriveList(QListWidget):
         
     def get_drive_letters(self) -> list:
         """Gibt eine Liste aller Laufwerksbuchstaben in der Liste zurück."""
-        return list(self.drive_items.keys())
+        drive_letters = list(self.drive_items.keys())
+        logger.debug(f"Verfügbare Laufwerksbuchstaben: {drive_letters}")
+        return drive_letters
+
+    def get_drive_status(self, drive_letter: str) -> str:
+        """Gibt den Status eines Laufwerks zurück."""
+        if drive_letter in self.drive_items:
+            drive_item = self.drive_items[drive_letter]
+            status = drive_item.widget.get_status() if hasattr(drive_item, 'widget') else 'unknown'
+            logger.debug(f"Status für Laufwerk {drive_letter}: {status}")
+            return status
+        logger.debug(f"Laufwerk {drive_letter} nicht in der Liste gefunden")
+        return 'unknown'
         
     def clear(self):
         """Leert die Liste."""

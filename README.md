@@ -125,7 +125,6 @@
   - Nutzungsstatistiken
   - Export-Funktionen
 
-
 ## ⚡ Performance
 
 ### Optimierte Dateiübertragung

@@ -9,8 +9,8 @@ from PyQt5.QtWidgets import (
     QTextEdit, QVBoxLayout, QMenu, QFileDialog, 
     QInputDialog, QMessageBox
 )
-from PyQt5.QtGui import QTextCharFormat, QBrush, QColor
-from PyQt5.QtCore import Qt, QObject, pyqtSignal
+from PyQt5.QtGui import QTextCharFormat, QBrush, QColor, QTextCursor
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, QDateTime
 
 from config.constants import LOG_VERZEICHNIS, LOG_DATEI
 
@@ -75,13 +75,12 @@ class QTextEditLogHandler(logging.Handler):
 class ProtokollWidget(QTextEdit):
     """Erweitertes QTextEdit für formatierte Protokollausgabe."""
     
-    # Log-Level Definitionen
+    # Log-Level Konstanten und Farben
     INFO = "INFO"
     WARNING = "WARNING"
     ERROR = "ERROR"
     DEBUG = "DEBUG"
     
-    # Farben für verschiedene Log-Level
     LEVEL_COLORS = {
         INFO: "#89d0ff",      # Heltes Blau
         WARNING: "#ffd700",   # Gold
@@ -89,92 +88,142 @@ class ProtokollWidget(QTextEdit):
         DEBUG: "#98c379",     # Grün
     }
     
+    LEVEL_MAP = {
+        INFO: logging.INFO,
+        WARNING: logging.WARNING,
+        ERROR: logging.ERROR,
+        DEBUG: logging.DEBUG
+    }
+    
     def __init__(self, parent=None, max_entries=1000):
         super().__init__(parent)
+        self.setReadOnly(True)
+        
+        # Einstellungen
         self.max_entries = max_entries
+        self.date_format = "HH:mm:ss"
+        self.auto_scroll = True
+        self.group_messages = False
+        self.show_line_numbers = False
+        self.visible_levels = {logging.INFO, logging.WARNING, logging.ERROR}
+        
+        # Log-Einträge und Gruppen
         self.log_entries = []
         self.current_group = None
         self.group_entries = {}
         self.expanded_groups = set()
-        self.date_format = "%H:%M:%S"
+        
+        # Suche
         self.search_text = ""
         self.search_results = []
         self.current_search_index = -1
         
-        # Layout und Styling
-        self.setReadOnly(True)
-        self.setStyleSheet("""
-            QTextEdit {
-                background-color: #1e1e1e;
-                color: #ffffff;
-                border: 1px solid #404040;
-                border-radius: 4px;
-                padding: 4px;
-                selection-background-color: #264f78;
-            }
-        """)
-        
-        # Kontextmenü aktivieren
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.customContextMenuRequested.connect(self._show_context_menu)
-
-        # Logging-Konfiguration
-        self.logger = logging.getLogger()
-        self.logger.setLevel(logging.DEBUG)
-        
-        # Formatierung
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
-        
-        # Console Handler
-        console = logging.StreamHandler()
-        console.setLevel(logging.INFO)
-        console.setFormatter(formatter)
-        self.logger.addHandler(console)
-        
-        # File Handler
-        if not os.path.exists(LOG_VERZEICHNIS):
-            os.makedirs(LOG_VERZEICHNIS)
-            
-        log_file = os.path.join(LOG_VERZEICHNIS, f"app_{datetime.now():%Y-%m-%d}.log")
-        file_handler = logging.handlers.RotatingFileHandler(
-            log_file,
-            maxBytes=10*1024*1024,  # 10 MB
-            backupCount=5
-        )
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(formatter)
-        self.logger.addHandler(file_handler)
-        
-        # QTextEditLogHandler
-        self.text_edit_handler = QTextEditLogHandler(self)
-        self.text_edit_handler.setFormatter(formatter)
-        self.logger.addHandler(self.text_edit_handler)
-
     def log(self, text: str, level: str = INFO, details: dict = None):
-        """Fügt einen formatierten Log-Eintrag hinzu."""
-        if len(self.log_entries) >= self.max_entries:
-            remove_count = len(self.log_entries) - self.max_entries + 1
-            self.log_entries = self.log_entries[remove_count:]
+        """Fügt einen formatierten Log-Eintrag hinzu.
+        
+        Args:
+            text: Die Log-Nachricht
+            level: Log-Level (INFO, WARNING, ERROR, DEBUG)
+            details: Optionale zusätzliche Details
+        """
+        try:
+            # Prüfe ob dieser Level angezeigt werden soll
+            if self.LEVEL_MAP.get(level) not in self.visible_levels:
+                return
+                
+            # Erstelle Log-Eintrag
+            entry = {
+                'text': text,
+                'level': level,
+                'timestamp': QDateTime.currentDateTime(),
+                'details': details or {},
+                'group_id': self.current_group
+            }
             
-        timestamp = datetime.now().strftime(self.date_format)
-        entry = {
-            'timestamp': timestamp,
-            'level': level,
-            'text': text,
-            'details': details or {},
-            'group': self.current_group
-        }
-        self.log_entries.append(entry)
+            # Gruppiere ähnliche Nachrichten wenn aktiviert
+            if self.group_messages and self.current_group:
+                group = self.group_entries.get(self.current_group, [])
+                group.append(entry)
+                self.group_entries[self.current_group] = group
+            else:
+                self.log_entries.append(entry)
+            
+            # Entferne alte Einträge wenn Maximum überschritten
+            while len(self.log_entries) > self.max_entries:
+                self.log_entries.pop(0)
+            
+            # Aktualisiere Anzeige
+            self.refresh_display()
+            
+        except Exception as e:
+            print(f"Fehler beim Loggen: {e}")
+            
+    def refresh_display(self):
+        """Aktualisiert die komplette Anzeige."""
+        try:
+            self.clear()
+            cursor = self.textCursor()
+            
+            for i, entry in enumerate(self.log_entries):
+                if entry['group_id'] and self.group_messages:
+                    self._format_group_entry(cursor, entry, i)
+                else:
+                    self._format_single_entry(cursor, entry, i)
+            
+            if self.auto_scroll:
+                self.scrollToBottom()
+                
+        except Exception as e:
+            print(f"Fehler beim Aktualisieren der Anzeige: {e}")
+            
+    def _format_single_entry(self, cursor: QTextCursor, entry: dict, index: int):
+        """Formatiert einen einzelnen Log-Eintrag."""
+        # Zeilennummer
+        if self.show_line_numbers:
+            number_format = QTextCharFormat()
+            number_format.setForeground(QBrush(QColor("#666666")))
+            cursor.insertText(f"{index+1:04d} ", number_format)
         
-        if self.current_group:
-            if self.current_group not in self.group_entries:
-                self.group_entries[self.current_group] = []
-            self.group_entries[self.current_group].append(entry)
+        # Zeitstempel
+        time_format = QTextCharFormat()
+        time_format.setForeground(QBrush(QColor("#666666")))
+        timestamp = entry['timestamp'].toString(self.date_format)
+        cursor.insertText(f"[{timestamp}] ", time_format)
         
-        self.logger.log(getattr(logging, level), text)
+        # Level-Badge
+        level_format = QTextCharFormat()
+        level_format.setBackground(QBrush(QColor(self.LEVEL_COLORS[entry['level']])))
+        level_format.setForeground(QBrush(QColor("#000000")))
+        cursor.insertText(f" {entry['level']} ", level_format)
+        cursor.insertText(" ")
+        
+        # Nachricht
+        msg_format = QTextCharFormat()
+        msg_format.setForeground(QBrush(QColor("#ffffff")))
+        cursor.insertText(entry['text'], msg_format)
+        cursor.insertText("\n")
+        
+    def _format_group_entry(self, cursor: QTextCursor, entry: dict, index: int):
+        """Formatiert eine Gruppe von ähnlichen Log-Einträgen."""
+        group = self.group_entries.get(entry['group_id'], [])
+        if not group:
+            return
+            
+        # Nur den ersten Eintrag der Gruppe anzeigen
+        self._format_single_entry(cursor, group[0], index)
+        
+        # Wenn Gruppe erweitert ist, zeige alle Einträge
+        if entry['group_id'] in self.expanded_groups:
+            for sub_entry in group[1:]:
+                cursor.insertText("  ")  # Einrückung
+                self._format_single_entry(cursor, sub_entry, index)
+        else:
+            # Zeige Anzahl der gruppierten Nachrichten
+            count = len(group) - 1
+            if count > 0:
+                count_format = QTextCharFormat()
+                count_format.setForeground(QBrush(QColor("#666666")))
+                cursor.insertText(f"  +{count} weitere ähnliche Meldungen\n", count_format)
 
     def _show_context_menu(self, position):
         """Zeigt das Kontextmenü an der angegebenen Position."""
@@ -198,7 +247,7 @@ class ProtokollWidget(QTextEdit):
         
         menu.addSeparator()
         
-        # Suchen
+        # Suche
         search_action = menu.addAction("Suchen...")
         search_action.triggered.connect(self.show_search_dialog)
         
@@ -288,8 +337,8 @@ class ProtokollWidget(QTextEdit):
         entry = self.log_entries[index]
         
         # Stelle sicher, dass die Gruppe erweitert ist
-        if entry['group']:
-            self.expanded_groups.add(entry['group'])
+        if entry['group_id']:
+            self.expanded_groups.add(entry['group_id'])
         
         # Aktualisiere die Anzeige
         self.clear()
